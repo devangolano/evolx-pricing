@@ -1,6 +1,6 @@
 import { 
   ShoppingBasket, Users, Database, 
-  Package, TrendingUp, Search
+  Package, TrendingUp
 } from "lucide-react"
 import { StatCard } from "../../components/stat-card"
 
@@ -54,23 +54,9 @@ const catalogOverview = [
 
 export default function Dashboard() {
   return (
-    <div className="flex flex-col gap-6 p-6 ">
-      {/* Header */}
-      <div className="flex justify-between items-center mb-4">
-        <h1 className="text-2xl font-bold text-gray-800">Dashboard</h1>
-        <div className="flex items-center gap-4">
-          <div className="relative">
-            <input
-              type="text"
-              placeholder="Pesquisar..."
-              className="pl-10 pr-4 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            <Search className="w-4 h-4 absolute left-3 top-3 text-gray-400" />
-          </div>
-          </div>
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className="flex flex-col gap-4 md:gap-6 p-2 ">
+        <h1 className="text-xl sm:text-2xl font-bold text-gray-800">Dashboard</h1>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         {metricsData.map((metric, index) => (
           <StatCard
             key={index}
@@ -84,15 +70,15 @@ export default function Dashboard() {
         ))}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         {/* Catalog Overview */}
-        <div className="bg-white rounded-lg p-6 shadow-sm hover:shadow-md transition-shadow duration-200">
-          <div className="flex items-center justify-between mb-6">
+        <div className="bg-white rounded-lg p-4 sm:p-6 shadow-sm hover:shadow-md transition-shadow duration-200">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 sm:mb-6">
             <div>
-              <h2 className="text-lg font-semibold text-gray-800">Visão Geral do Catálogo</h2>
-              <p className="text-sm text-gray-500">Atualizado há 5 minutos</p>
+              <h2 className="text-base sm:text-lg font-semibold text-gray-800">Visão Geral do Catálogo</h2>
+              <p className="text-xs sm:text-sm text-gray-500">Atualizado há 5 minutos</p>
             </div>
-            <Database className="w-5 h-5 text-gray-400" />
+            <Database className="hidden sm:block w-5 h-5 text-gray-400" />
           </div>
           <div className="space-y-4">
             {catalogOverview.map((item) => (
@@ -111,25 +97,25 @@ export default function Dashboard() {
         </div>
 
         {/* Recent Activities */}
-        <div className="bg-white rounded-lg p-6 shadow-sm hover:shadow-md transition-shadow duration-200">
-          <div className="flex items-center justify-between mb-6">
+        <div className="bg-white rounded-lg p-4 sm:p-6 shadow-sm hover:shadow-md transition-shadow duration-200">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 sm:mb-6">
             <div>
-              <h2 className="text-lg font-semibold text-gray-800">Atividades Recentes</h2>
-              <p className="text-sm text-gray-500">Últimas 24 horas</p>
+              <h2 className="text-base sm:text-lg font-semibold text-gray-800">Atividades Recentes</h2>
+              <p className="text-xs sm:text-sm text-gray-500">Últimas 24 horas</p>
             </div>
-            <TrendingUp className="w-5 h-5 text-gray-400" />
+            <TrendingUp className="hidden sm:block w-5 h-5 text-gray-400" />
           </div>
-          <div className="space-y-4">
+          <div className="space-y-3 sm:space-y-4">
             {recentActivities.map((activity) => (
-              <div key={activity.id} className="flex items-center justify-between py-3 border-b">
-                <div className="flex items-start gap-3">
+              <div key={activity.id} className="flex items-center justify-between py-2 sm:py-3 border-b">
+                <div className="flex items-start gap-2 sm:gap-3">
                   <div className={`w-2 h-2 mt-2 rounded-full ${
                     activity.priority === 'high' ? 'bg-red-500' :
                     activity.priority === 'medium' ? 'bg-yellow-500' : 'bg-green-500'
                   }`} />
                   <div>
-                    <p className="font-medium text-gray-800">{activity.user}</p>
-                    <p className="text-sm text-gray-600">{activity.action}</p>
+                    <p className="font-medium text-sm sm:text-base text-gray-800">{activity.user}</p>
+                    <p className="text-xs sm:text-sm text-gray-600">{activity.action}</p>
                   </div>
                 </div>
                 <span className="text-xs text-gray-400">{activity.time}</span>

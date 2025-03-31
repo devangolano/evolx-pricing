@@ -41,6 +41,10 @@ export const router = createBrowserRouter([
         element: <PriceBaskets />,
       },
       {
+        path: '/basket/:id',
+        element: <PriceBaskets />,
+      },
+      {
         path: '/cestas',
         element: <Baskets />,
       },

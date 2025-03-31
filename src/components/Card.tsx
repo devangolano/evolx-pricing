@@ -1,19 +1,8 @@
 "use client"
-import { User, FileText } from "lucide-react"
+
+import type React from "react"
 
 type StatusType = "EM ANDAMENTO" | "PRONTA" | "LIBERADA PARA CESTA" | "EM ABERTO"
-
-interface StatusConfig {
-  label: string
-  bgColor: string
-}
-
-const STATUS_CONFIG: Record<StatusType, StatusConfig> = {
-  "EM ANDAMENTO": { label: "EM ANDAMENTO", bgColor: "bg-[#78b6e8]" },
-  PRONTA: { label: "PRONTA", bgColor: "bg-[#8fe878]" },
-  "LIBERADA PARA CESTA": { label: "LIBERADA PARA CESTA", bgColor: "bg-[#9078e8]" },
-  "EM ABERTO": { label: "EM ABERTO", bgColor: "bg-[#decc49]" },
-}
 
 interface BasketItemProps {
   id: string
@@ -21,43 +10,57 @@ interface BasketItemProps {
   status: StatusType
   description: string
   userName: string
-  onClick?: () => void
+  userNumber?: string
+  onClick: () => void
+  isSelected?: boolean
 }
 
-export function BasketItem({ id, date, status, description, userName, onClick }: BasketItemProps) {
-  const config = STATUS_CONFIG[status]
+export const BasketItem: React.FC<BasketItemProps> = ({
+  id,
+  date,
+  status,
+  description,
+  userName,
+  userNumber,
+  onClick,
+  isSelected = false,
+}) => {
+  const getStatusColor = (status: StatusType) => {
+    switch (status) {
+      case "EM ANDAMENTO":
+        return "bg-[#78b6e8]"
+      case "PRONTA":
+        return "bg-[#8fe878]"
+      case "LIBERADA PARA CESTA":
+        return "bg-[#9078e8]"
+      case "EM ABERTO":
+        return "bg-[#decc49]"
+      default:
+        return "bg-gray-400"
+    }
+  }
+
+  // Extract just the date part if the date includes time
+  const displayDate = date.includes(" ") ? date.split(" ")[0] : date
 
   return (
-    <div className="bg-white border border-[#e0e0e0] rounded-md cursor-pointer w-full" onClick={onClick}>
-      {/* ID e Data - Centralizados */}
-      <div className="text-center pt-5 pb-3">
-        <div className="font-medium text-lg text-[#333333]">#{id}</div>
-        <div className="text-sm text-[#646464]">{date}</div>
-      </div>
-
-      {/* Status - Centralizado */}
-      <div className="flex justify-center mb-4">
-        <span className={`inline-block px-6 py-1.5 ${config.bgColor} text-white text-sm font-normal rounded-md`}>
-          {config.label}
-        </span>
-      </div>
-
-      {/* Conteúdo com ícone à esquerda */}
-      <div className="px-5 pb-5">
-        {/* Descrição com ícone */}
-        <div className="flex mb-4">
-          <div className="mr-3 mt-0.5 flex-shrink-0">
-            <FileText className="h-5 w-5 text-[#646464]" />
-          </div>
-          <p className="text-sm text-[#333333] leading-normal">{description}</p>
+    <div
+      className={`border-b border-[#3a3a3a] pb-3 cursor-pointer hover:bg-[#333333] p-2 rounded ${isSelected ? "bg-[#333333]" : ""}`}
+      onClick={onClick}
+    >
+      <div className="flex items-center justify-between mb-1">
+        <div className="flex items-center">
+          <span className="font-bold text-gray-200">#{id}</span>
+          <span className="ml-2 text-gray-400 text-sm">{displayDate}</span>
         </div>
-
-        {/* Usuário */}
-        <div className="flex items-center text-sm text-[#646464]">
-          <User className="w-5 h-5 mr-2" />
-          <span className="text-base text-[#555555]">{userName}</span>
+        <div className="text-xs text-gray-300">
+          {userName} {userNumber && <span className="text-gray-400">{userNumber}</span>}
         </div>
       </div>
+      <div className="mb-1">
+        <span className={`text-xs px-2 py-0.5 rounded-sm ${getStatusColor(status)} text-white`}>{status}</span>
+      </div>
+      <div className="text-sm text-gray-300 line-clamp-2">{description}</div>
     </div>
   )
 }

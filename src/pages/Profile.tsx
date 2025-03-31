@@ -84,7 +84,7 @@ export function Profile() {
 
   return (
     <Layout>
-      <div className="flex justify-between items-center p-4 border-b border-[#e0e0e0]">
+      <div className="flex justify-between items-center p-4 shadow-lg bg-white border-b border-[#e0e0e0]">
         <h1 className="text-xl font-medium text-[#302f2f]">Editar perfil</h1>
         <button 
           className="text-[#7baa3d] hover:opacity-80"

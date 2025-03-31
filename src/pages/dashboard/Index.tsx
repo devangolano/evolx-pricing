@@ -1,6 +1,6 @@
 import { 
   ShoppingBasket, Users, Database, 
-  Package, TrendingUp, Bell, Search
+  Package, TrendingUp, Search
 } from "lucide-react"
 import { StatCard } from "../../components/stat-card"
 

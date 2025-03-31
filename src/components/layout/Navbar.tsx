@@ -1,10 +1,17 @@
 import { Search, ChevronDown, Menu } from "lucide-react"
 import { useState } from "react"
+import { useNavigate } from "react-router-dom"
 import { Sidebar } from "./Sidebar"
 
 export function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const navigate = useNavigate();
+
+  const handleProfileClick = () => {
+    navigate('/profile');
+    setMobileMenuOpen(false);
+  };
 
   return (
     <>
@@ -45,9 +52,9 @@ export function Navbar() {
             <div className="hidden sm:flex flex-col">
               <span className="text-[#7baa3d] text-base">Conta de Usuário</span>
               <div className="flex items-center text-sm text-gray-300">
-                <span>Meu Perfil</span>
+                <button onClick={handleProfileClick}>Meu Perfil</button>
                 <span className="mx-2">|</span>
-                <span>SAIR</span>
+                <button>SAIR</button>
               </div>
             </div>
             <div className="relative ml-1 sm:ml-2">
@@ -80,8 +87,8 @@ export function Navbar() {
           <div className="md:hidden mt-4 bg-[#444444] rounded-md p-4">
             <div className="flex flex-col space-y-3">
               <span className="text-[#7baa3d]">Conta de Usuário</span>
-              <span>Meu Perfil</span>
-              <span>SAIR</span>
+              <button onClick={handleProfileClick}>Meu Perfil</button>
+              <button>SAIR</button>
             </div>
           </div>
         )}

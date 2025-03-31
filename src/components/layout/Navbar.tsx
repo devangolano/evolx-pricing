@@ -13,6 +13,15 @@ export function Navbar() {
     setMobileMenuOpen(false);
   };
 
+  const handleLogout = () => {
+    // Clear all authentication data
+    localStorage.clear();
+    sessionStorage.clear();
+    
+    // Redirect to login page
+    window.location.href = '/auth/entrar';
+  };
+
   return (
     <>
       <header className="bg-[#333333] text-white px-4 sm:px-6 py-4">
@@ -54,7 +63,7 @@ export function Navbar() {
               <div className="flex items-center text-sm text-gray-300">
                 <button onClick={handleProfileClick}>Meu Perfil</button>
                 <span className="mx-2">|</span>
-                <button>SAIR</button>
+                <button onClick={handleLogout}>SAIR</button>
               </div>
             </div>
             <div className="relative ml-1 sm:ml-2">
@@ -88,7 +97,7 @@ export function Navbar() {
             <div className="flex flex-col space-y-3">
               <span className="text-[#7baa3d]">Conta de Usuário</span>
               <button onClick={handleProfileClick}>Meu Perfil</button>
-              <button>SAIR</button>
+              <button onClick={handleLogout}>SAIR</button>
             </div>
           </div>
         )}

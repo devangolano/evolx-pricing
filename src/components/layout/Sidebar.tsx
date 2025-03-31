@@ -1,6 +1,7 @@
 import { Clock, LayoutGrid, Heart, MessageSquare, FileText, ClipboardList, Settings, LogOut, X } from "lucide-react"
 import { useState, useEffect } from "react"
 import { Link, useLocation } from "react-router-dom"
+import { useNavigate } from "react-router-dom";
 
 type SidebarProps = {
   isOpen?: boolean;
@@ -10,6 +11,7 @@ type SidebarProps = {
 export function Sidebar({ isOpen = true, onClose }: SidebarProps) {
   const [isMobile, setIsMobile] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
 
   useEffect(() => {
     const checkScreenSize = () => {
@@ -43,13 +45,34 @@ export function Sidebar({ isOpen = true, onClose }: SidebarProps) {
   ];
 
   const handleLogout = () => {
-    // Add your logout logic here
-    localStorage.removeItem('token'); // or any other auth token you're using
-    window.location.href = '/auth/login';
+    // Clear all authentication data
+    localStorage.clear();
+    sessionStorage.clear();
+    
+    // Redirect to login page
+    window.location.href = '/auth/entrar';
+  };
+
+  const handleNavigation = (path: string) => {
+    if (isMobile) {
+      // Add fade-out animation class
+      const sidebar = document.querySelector('.sidebar-container');
+      sidebar?.classList.add('animate-fadeOut');
+
+      // Wait for animation and then navigate
+      setTimeout(() => {
+        navigate(path);
+        onClose?.();
+      }, 300);
+    } else {
+      navigate(path);
+    }
   };
 
   return (
-    <aside className={sidebarClasses}>
+    <aside className={`${sidebarClasses} sidebar-container ${
+      isOpen ? 'animate-fadeIn' : ''
+    }`}>
       {isMobile && (
         <div className="flex justify-end p-2">
           <button 
@@ -65,9 +88,9 @@ export function Sidebar({ isOpen = true, onClose }: SidebarProps) {
         <ul className="space-y-2">
           {menuItems.map((item) => (
             <li key={item.path}>
-              <Link
-                to={item.path}
-                className={`flex items-center ${
+              <button
+                onClick={() => handleNavigation(item.path)}
+                className={`w-full flex items-center ${
                   location.pathname === item.path
                     ? "bg-[#333333] text-white"
                     : "text-[#333333] hover:bg-[#333333] hover:text-white"
@@ -77,7 +100,7 @@ export function Sidebar({ isOpen = true, onClose }: SidebarProps) {
                   <item.icon className="w-5 h-5" />
                 </div>
                 <span className="text-sm">{item.label}</span>
-              </Link>
+              </button>
             </li>
           ))}
         </ul>

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useNavigate, useParams } from "react-router-dom"
+import { useNavigate, useParams, useLocation } from "react-router-dom"
 import {
   Filter,
   CalendarIcon,
@@ -17,6 +17,9 @@ import {
   Download,
   User,
   FileSpreadsheet,
+  X,
+  Barcode,
+  Search,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -25,11 +28,14 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Checkbox } from "@/components/ui/checkbox"
 import { cn } from "@/lib/utils"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
 
 type StatusType = "EM ANDAMENTO" | "PRONTA" | "LIBERADA PARA CESTA" | "EM ABERTO"
 type SortOrder = "asc" | "desc"
+type ContractType = "LICITAÇÃO" | "DISPENSA/INEXIGIBILIDADE" 
 
-// Define the interface outside of the JSX
+// Atualizar a interface BasketDetail para incluir todos os campos exibidos na página de detalhes
 interface BasketDetail {
   id: string
   date: string
@@ -37,7 +43,7 @@ interface BasketDetail {
   description: string
   userName: string
   userNumber?: string
-  elementType?: string
+  elementType?: ContractType
   calculationType?: string
   decimals?: number
   supportStatus?: string
@@ -46,6 +52,13 @@ interface BasketDetail {
   basketDate?: string
   quotationDeadline?: string
   possession?: string
+  expenseElement?: string
+  requestDate?: string
+  correctionIndex?: string
+  correctionTarget?: string
+  correctionStartDate?: string
+  correctionEndDate?: string
+  researchDocuments?: string
   files?: {
     name: string
     size: string
@@ -91,6 +104,7 @@ const allBasketsData: BasketDetail[] = [
     possession: "CLIENTE",
     finalizedDate: "26/03/2025 20:08",
     basketDate: "26/03/2025",
+    researchDocuments: "DOC-2025-0441",
     files: [
       {
         name: "MAPA DE APURAÇÃO DE PREÇOS.pdf",
@@ -257,9 +271,80 @@ function SimpleCalendar({ onSelectDate, onClose }: { onSelectDate: (date: string
   )
 }
 
+// Componente para o modal de pesquisa de documentos
+function DocumentSearchModal({
+  onClose,
+  onSelect,
+}: { isOpen: boolean; onClose: () => void; onSelect: (code: string) => void }) {
+  const [searchTerm, setSearchTerm] = useState("")
+  const [searchResults, setSearchResults] = useState([
+    { code: "DOC-2025-0441", description: "Pesquisa de Preços - Kits de Higiene Bucal" },
+    { code: "DOC-2025-0442", description: "Pesquisa de Preços - Material Escolar" },
+    { code: "DOC-2025-0443", description: "Pesquisa de Preços - Equipamentos de Informática" },
+    { code: "DOC-2025-0444", description: "Pesquisa de Preços - Material de Limpeza" },
+    { code: "DOC-2025-0445", description: "Pesquisa de Preços - Mobiliário" },
+  ])
+
+  const filteredResults = searchTerm
+    ? searchResults.filter(
+        (item) =>
+          item.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          item.description.toLowerCase().includes(searchTerm.toLowerCase()),
+      )
+    : searchResults
+
+  return (
+    <div className="p-4 space-y-4">
+      <div className="flex gap-2">
+        <Input
+          placeholder="Buscar por código ou descrição"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="flex-1"
+        />
+        <Button variant="outline" size="icon">
+          <Search className="h-4 w-4" />
+        </Button>
+      </div>
+
+      <div className="border rounded-md divide-y">
+        {filteredResults.length > 0 ? (
+          filteredResults.map((item) => (
+            <div
+              key={item.code}
+              className="p-3 hover:bg-gray-50 cursor-pointer flex justify-between items-center"
+              onClick={() => {
+                onSelect(item.code)
+                onClose()
+              }}
+            >
+              <div>
+                <div className="font-medium text-sm">{item.code}</div>
+                <div className="text-xs text-gray-500">{item.description}</div>
+              </div>
+              <Button variant="ghost" size="sm" className="text-blue-600">
+                Selecionar
+              </Button>
+            </div>
+          ))
+        ) : (
+          <div className="p-4 text-center text-gray-500">Nenhum resultado encontrado</div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+const STATUS_CONFIG = {
+  "EM ANDAMENTO": { label: "EM ANDAMENTO", color: "bg-blue-500 hover:bg-blue-600" },
+  PRONTA: { label: "PRONTA", color: "bg-green-500 hover:bg-green-600" },
+  "LIBERADA PARA CESTA": { label: "LIBERADA PARA CESTA", color: "bg-purple-500 hover:bg-purple-600" },
+  "EM ABERTO": { label: "EM ABERTO", color: "bg-yellow-500 hover:bg-yellow-600" },
+}
 
 export default function PriceBaskets() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { id } = useParams<{ id: string }>()
 
   const [selectedBasket, setSelectedBasket] = useState<BasketDetail | null>(null)
@@ -268,11 +353,39 @@ export default function PriceBaskets() {
   const [itemsToShow, setItemsToShow] = useState(10)
   // Add state to control mobile view
   const [showDetailsMobile, setShowDetailsMobile] = useState(false)
+  // Estado para controlar o modal de pesquisa de documentos
+  const [isDocSearchOpen, setIsDocSearchOpen] = useState(false)
 
   // Filtros
   const [statusFilter, setStatusFilter] = useState<StatusType | null>(null)
   const [dateFilter, setDateFilter] = useState<string | null>(null)
   const [sortOrder, setSortOrder] = useState<SortOrder>("desc")
+
+  // Adicionar estados para controlar os valores dos dropdowns
+  const [expenseElement, setExpenseElement] = useState<string>("MATERIAL DE CONSUMO / MATERIAL DE HIGIENE")
+  const [contractType, setContractType] = useState<ContractType>(selectedBasket?.elementType || "LICITAÇÃO")
+  const [calculationType, setCalculationType] = useState<string>(selectedBasket?.calculationType || "MÉDIA ARITMÉTICA")
+  const [supportStatus, setSupportStatus] = useState<string>(selectedBasket?.supportStatus || "FINALIZADA")
+  const [clientStatus, setClientStatus] = useState<string>(selectedBasket?.clientStatus || "PRONTA")
+  const [correctionTarget, setCorrectionTarget] = useState<string>("NÃO CORRIGIR")
+  const [correctionIndex, setCorrectionIndex] = useState<string>("Selecionar")
+  const [correctionStartDate, setCorrectionStartDate] = useState<string | null>(null)
+  const [correctionEndDate, setCorrectionEndDate] = useState<string | null>(null)
+  const [decimals, setDecimals] = useState<number>(selectedBasket?.decimals || 3)
+  const [researchDocuments, setResearchDocuments] = useState<string>(selectedBasket?.researchDocuments || "")
+
+  // Atualizar os estados quando o selectedBasket mudar
+  useEffect(() => {
+    if (selectedBasket) {
+      setCalculationType(selectedBasket.calculationType || "MÉDIA ARITMÉTICA")
+      setSupportStatus(selectedBasket.supportStatus || "FINALIZADA")
+      setClientStatus(selectedBasket.clientStatus || "PRONTA")
+      setDecimals(selectedBasket.decimals || 3)
+      setExpenseElement(selectedBasket.expenseElement || "MATERIAL DE CONSUMO / MATERIAL DE HIGIENE")
+      setContractType(selectedBasket.elementType || "LICITAÇÃO")
+      setResearchDocuments(selectedBasket.researchDocuments || "")
+    }
+  }, [selectedBasket])
 
   // Atualizar a cesta selecionada quando o ID na URL mudar
   useEffect(() => {
@@ -371,7 +484,7 @@ export default function PriceBaskets() {
   }
 
   return (
-    <div className="container mx-auto sm:px-4 py-3 sm:py-4 space-y-3 sm:space-y-4">
+    <div className="container mx-auto px-2 sm:px-4 py-3 sm:py-4 space-y-3 sm:space-y-4">
       {/* Stats Cards - Hide when showing details on mobile */}
       <div className={`grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 ${showDetailsMobile ? "hidden sm:grid" : ""}`}>
         <div className="bg-white shadow rounded-lg p-2 sm:p-3">
@@ -461,7 +574,8 @@ export default function PriceBaskets() {
           className="text-destructive hover:text-destructive hover:bg-destructive/10 h-8 sm:h-9 text-xs sm:text-sm px-2 sm:px-3"
           onClick={handleClearFilters}
         >
-          Limpar Filtros
+          <X className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
+          <span className="hidden xs:inline">Limpar Filtros</span>
         </Button>
       </div>
 
@@ -554,7 +668,7 @@ export default function PriceBaskets() {
                     <span className="hidden sm:inline">Voltar</span>
                   </Button>
                   <h2 className="text-base sm:text-lg font-medium text-gray-900 truncate">
-                    <span className="">Detalhes</span>
+                    <span className="hidden sm:inline">Detalhes da Cesta</span> #{selectedBasket.id}
                   </h2>
                 </div>
                 <div className="flex space-x-1">
@@ -600,14 +714,44 @@ export default function PriceBaskets() {
                       <p className="text-gray-500 text-xs sm:text-sm italic">Nenhuma observação registrada!</p>
                     </div>
 
-                    <div>
-                      <h3 className="text-xs font-semibold uppercase text-gray-500 mb-1">OBJETO</h3>
-                      <div className="p-2 bg-gray-50 rounded-md text-xs sm:text-sm text-gray-700 border border-gray-200">
-                        {selectedBasket.description}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4">
+                      <div className="col-span-2">
+                        <h3 className="text-xs font-semibold uppercase text-gray-500 mb-1">OBJETO</h3>
+                        <div className="p-2 bg-gray-50 rounded-md text-xs sm:text-sm text-gray-700 border border-gray-200">
+                          {selectedBasket.description}
+                        </div>
+                      </div>
+                      <div>
+                        <h3 className="text-xs font-semibold uppercase text-gray-500 mb-1">DOCUMENTOS DAS PESQUISAS</h3>
+                        <div className="flex">
+                          <Input
+                            value={researchDocuments}
+                            onChange={(e) => setResearchDocuments(e.target.value)}
+                            className="flex-1 h-8 sm:h-9 text-xs sm:text-sm bg-gray-50 border-gray-200"
+                            placeholder="Código do documento"
+                          />
+                          <Dialog open={isDocSearchOpen} onOpenChange={setIsDocSearchOpen}>
+                            <DialogTrigger asChild>
+                              <Button variant="outline" className="ml-1 h-8 sm:h-9 px-2 border-gray-200 text-gray-700">
+                                <Barcode size={14} />
+                              </Button>
+                            </DialogTrigger>
+                            <DialogContent className="sm:max-w-md">
+                              <DialogHeader>
+                                <DialogTitle>Pesquisar Documentos</DialogTitle>
+                              </DialogHeader>
+                              <DocumentSearchModal
+                                isOpen={isDocSearchOpen}
+                                onClose={() => setIsDocSearchOpen(false)}
+                                onSelect={(code) => setResearchDocuments(code)}
+                              />
+                            </DialogContent>
+                          </Dialog>
+                        </div>
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4">
                       <div>
                         <h3 className="text-xs font-semibold uppercase text-gray-500 mb-1">ELEMENTO DE DESPESA</h3>
                         <DropdownMenu>
@@ -616,26 +760,44 @@ export default function PriceBaskets() {
                               variant="outline"
                               className="w-full justify-between bg-gray-50 border-gray-200 text-gray-700 h-8 sm:h-9 text-xs sm:text-sm"
                             >
-                              <span className="truncate">MATERIAL DE CONSUMO / HIGIENE</span>
+                              <span className="truncate">{expenseElement}</span>
                               <ChevronDown size={12} />
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem>MATERIAL DE CONSUMO</DropdownMenuItem>
-                            <DropdownMenuItem>MATERIAL DE HIGIENE</DropdownMenuItem>
-                            <DropdownMenuItem>OUTROS</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => setExpenseElement("MATERIAL DE CONSUMO")}>
+                              MATERIAL DE CONSUMO
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => setExpenseElement("MATERIAL DE HIGIENE")}>
+                              MATERIAL DE HIGIENE
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => setExpenseElement("MATERIAL DE CONSUMO / MATERIAL DE HIGIENE")}
+                            >
+                              MATERIAL DE CONSUMO / MATERIAL DE HIGIENE
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => setExpenseElement("OUTROS")}>OUTROS</DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </div>
                       <div>
                         <h3 className="text-xs font-semibold uppercase text-gray-500 mb-1">TIPO DE CONTRATAÇÃO</h3>
-                        <div className="p-2 bg-gray-50 rounded-md text-xs sm:text-sm text-gray-700 border border-gray-200 h-8 sm:h-9 flex items-center">
-                          {selectedBasket.elementType}
-                        </div>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="outline"
+                              className="w-full justify-between bg-gray-50 border-gray-200 text-gray-700 h-8 sm:h-9 text-xs sm:text-sm"
+                            >
+                              <span className="truncate">{contractType}</span>
+                              <ChevronDown size={12} />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => setContractType("LICITAÇÃO")}>LICITAÇÃO</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => setContractType("DISPENSA/INEXIGIBILIDADE")}>DISPENSA/INEXIGIBILIDADE</DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
                       <div>
                         <h3 className="text-xs font-semibold uppercase text-gray-500 mb-1">TIPO DE CÁLCULO</h3>
                         <DropdownMenu>
@@ -644,62 +806,31 @@ export default function PriceBaskets() {
                               variant="outline"
                               className="w-full justify-between bg-gray-50 border-gray-200 text-gray-700 h-8 sm:h-9 text-xs sm:text-sm"
                             >
-                              <span className="truncate">{selectedBasket.calculationType}</span>
+                              <span className="truncate">{calculationType}</span>
                               <ChevronDown size={12} />
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem>MÉDIA ARITMÉTICA</DropdownMenuItem>
-                            <DropdownMenuItem>MEDIANA</DropdownMenuItem>
-                            <DropdownMenuItem>MENOR PREÇO</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => setCalculationType("MÉDIA ARITMÉTICA")}>
+                              MÉDIA ARITMÉTICA
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => setCalculationType("MEDIANA")}>MEDIANA</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => setCalculationType("MENOR PREÇO")}>
+                              MENOR PREÇO
+                            </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </div>
-                      <div>
-                        <h3 className="text-xs font-semibold uppercase text-gray-500 mb-1">CASAS DECIMAIS</h3>
-                        <div className="flex items-center space-x-3 sm:space-x-4 mt-1 sm:mt-2">
-                          <div className="flex items-center space-x-1 sm:space-x-2">
-                            <Checkbox
-                              id="decimal-2"
-                              className="border-gray-300 data-[state=checked]:bg-[#7baa3d] data-[state=checked]:border-[#7baa3d] h-3.5 w-3.5 sm:h-4 sm:w-4"
-                            />
-                            <label htmlFor="decimal-2" className="text-xs sm:text-sm cursor-pointer text-gray-700">
-                              2
-                            </label>
-                          </div>
-                          <div className="flex items-center space-x-1 sm:space-x-2">
-                            <Checkbox
-                              id="decimal-3"
-                              defaultChecked
-                              className="border-gray-300 data-[state=checked]:bg-[#7baa3d] data-[state=checked]:border-[#7baa3d] h-3.5 w-3.5 sm:h-4 sm:w-4"
-                            />
-                            <label htmlFor="decimal-3" className="text-xs sm:text-sm cursor-pointer text-gray-700">
-                              3
-                            </label>
-                          </div>
-                          <div className="flex items-center space-x-1 sm:space-x-2">
-                            <Checkbox
-                              id="decimal-4"
-                              className="border-gray-300 data-[state=checked]:bg-[#7baa3d] data-[state=checked]:border-[#7baa3d] h-3.5 w-3.5 sm:h-4 sm:w-4"
-                            />
-                            <label htmlFor="decimal-4" className="text-xs sm:text-sm cursor-pointer text-gray-700">
-                              4
-                            </label>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
                       <div>
                         <h3 className="text-xs font-semibold uppercase text-gray-500 mb-1">DATA DA SOLICITAÇÃO</h3>
                         <div className="p-2 bg-gray-50 rounded-md text-xs sm:text-sm text-gray-700 border border-gray-200 h-8 sm:h-9 flex items-center">
                           18/03/2025 19:56
                         </div>
                       </div>
-                    </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+                     
+                      
                       <div>
                         <h3 className="text-xs font-semibold uppercase text-gray-500 mb-1">SITUAÇÃO SUPORTE</h3>
                         <DropdownMenu>
@@ -708,14 +839,18 @@ export default function PriceBaskets() {
                               variant="outline"
                               className="w-full justify-between bg-gray-50 border-gray-200 text-gray-700 h-8 sm:h-9 text-xs sm:text-sm"
                             >
-                              <span className="truncate">{selectedBasket.supportStatus}</span>
+                              <span className="truncate">{supportStatus}</span>
                               <ChevronDown size={12} />
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem>FINALIZADA</DropdownMenuItem>
-                            <DropdownMenuItem>EM ANDAMENTO</DropdownMenuItem>
-                            <DropdownMenuItem>PENDENTE</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => setSupportStatus("FINALIZADA")}>
+                              FINALIZADA
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => setSupportStatus("EM ANDAMENTO")}>
+                              EM ANDAMENTO
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => setSupportStatus("PENDENTE")}>PENDENTE</DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </div>
@@ -727,20 +862,45 @@ export default function PriceBaskets() {
                               variant="outline"
                               className="w-full justify-between bg-gray-50 border-gray-200 text-gray-700 h-8 sm:h-9 text-xs sm:text-sm"
                             >
-                              <span className="truncate">{selectedBasket.clientStatus}</span>
+                              <span className="truncate">{clientStatus}</span>
                               <ChevronDown size={12} />
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem>PRONTA</DropdownMenuItem>
-                            <DropdownMenuItem>EM ANÁLISE</DropdownMenuItem>
-                            <DropdownMenuItem>AGUARDANDO</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => setClientStatus("PRONTA")}>PRONTA</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => setClientStatus("EM ANÁLISE")}>
+                              EM ANÁLISE
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => setClientStatus("AGUARDANDO")}>
+                              AGUARDANDO
+                            </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </div>
-                    </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+                      
+                      <div>
+                        <h3 className="text-xs font-semibold uppercase text-gray-500 mb-1">DATA DA FINALIZAÇÃO</h3>
+                        <div className="p-2 bg-gray-50 rounded-md text-xs sm:text-sm text-gray-700 border border-gray-200 h-8 sm:h-9 flex items-center">
+                          {selectedBasket.finalizedDate}
+                        </div>
+                      </div>
+                      <div>
+                        <h3 className="text-xs font-semibold uppercase text-gray-500 mb-1">DATA DA CESTA</h3>
+                        <div className="p-2 bg-gray-50 rounded-md text-xs sm:text-sm text-gray-700 border border-gray-200 h-8 sm:h-9 flex items-center">
+                          {selectedBasket.basketDate}
+                        </div>
+                      </div>
+
+                      <div>
+                      <h3 className="text-xs font-semibold uppercase text-gray-500 mb-1">
+                        PRAZO PARA ENVIO DE COTAÇÕES
+                      </h3>
+                      <div className="p-2 bg-gray-50 rounded-md text-xs sm:text-sm text-gray-700 border border-gray-200 h-8 sm:h-9 flex items-center">
+                        {selectedBasket.quotationDeadline || "Não definido"}
+                      </div>
+                    </div>
+                    
                       <div>
                         <h3 className="text-xs font-semibold uppercase text-gray-500 mb-1">POSSE</h3>
                         <div className="flex items-center">
@@ -759,30 +919,47 @@ export default function PriceBaskets() {
                           </Button>
                         </div>
                       </div>
-                    </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
                       <div>
-                        <h3 className="text-xs font-semibold uppercase text-gray-500 mb-1">DATA DA FINALIZAÇÃO</h3>
-                        <div className="p-2 bg-gray-50 rounded-md text-xs sm:text-sm text-gray-700 border border-gray-200 h-8 sm:h-9 flex items-center">
-                          {selectedBasket.finalizedDate}
+                        <h3 className="text-xs font-semibold uppercase text-gray-500 mb-1">CASAS DECIMAIS</h3>
+                        <div className="flex items-center space-x-3 sm:space-x-4 mt-1 sm:mt-2">
+                          <div className="flex items-center space-x-1 sm:space-x-2">
+                            <Checkbox
+                              id="decimal-2"
+                              checked={decimals === 2}
+                              onCheckedChange={() => setDecimals(2)}
+                              className="border-gray-300 data-[state=checked]:bg-[#7baa3d] data-[state=checked]:border-[#7baa3d] h-3.5 w-3.5 sm:h-4 sm:w-4"
+                            />
+                            <label htmlFor="decimal-2" className="text-xs sm:text-sm cursor-pointer text-gray-700">
+                              2
+                            </label>
+                          </div>
+                          <div className="flex items-center space-x-1 sm:space-x-2">
+                            <Checkbox
+                              id="decimal-3"
+                              checked={decimals === 3}
+                              onCheckedChange={() => setDecimals(3)}
+                              className="border-gray-300 data-[state=checked]:bg-[#7baa3d] data-[state=checked]:border-[#7baa3d] h-3.5 w-3.5 sm:h-4 sm:w-4"
+                            />
+                            <label htmlFor="decimal-3" className="text-xs sm:text-sm cursor-pointer text-gray-700">
+                              3
+                            </label>
+                          </div>
+                          <div className="flex items-center space-x-1 sm:space-x-2">
+                            <Checkbox
+                              id="decimal-4"
+                              checked={decimals === 4}
+                              onCheckedChange={() => setDecimals(4)}
+                              className="border-gray-300 data-[state=checked]:bg-[#7baa3d] data-[state=checked]:border-[#7baa3d] h-3.5 w-3.5 sm:h-4 sm:w-4"
+                            />
+                            <label htmlFor="decimal-4" className="text-xs sm:text-sm cursor-pointer text-gray-700">
+                              4
+                            </label>
+                          </div>
                         </div>
                       </div>
-                      <div>
-                        <h3 className="text-xs font-semibold uppercase text-gray-500 mb-1">DATA DA CESTA</h3>
-                        <div className="p-2 bg-gray-50 rounded-md text-xs sm:text-sm text-gray-700 border border-gray-200 h-8 sm:h-9 flex items-center">
-                          {selectedBasket.basketDate}
-                        </div>
-                      </div>
-                    </div>
 
-                    <div>
-                      <h3 className="text-xs font-semibold uppercase text-gray-500 mb-1">
-                        PRAZO PARA ENVIO DE COTAÇÕES
-                      </h3>
-                      <div className="p-2 bg-gray-50 rounded-md text-xs sm:text-sm text-gray-700 border border-gray-200 h-8 sm:h-9 flex items-center">
-                        {selectedBasket.quotationDeadline || "Não definido"}
-                      </div>
+                    
                     </div>
 
                     <div>
@@ -817,7 +994,7 @@ export default function PriceBaskets() {
 
                     <div>
                       <h3 className="text-xs font-semibold uppercase text-gray-500 mb-1">CORRIGIR VALORES</h3>
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4">
+                      <div className="grid grid-cols-1 md:grid-cols-4 gap-3 sm:gap-4">
                         <div>
                           <h4 className="text-xs uppercase text-gray-500 mb-1">INCIDIR SOBRE</h4>
                           <DropdownMenu>
@@ -826,14 +1003,20 @@ export default function PriceBaskets() {
                                 variant="outline"
                                 className="w-full justify-between bg-gray-50 border-gray-200 text-gray-700 h-8 sm:h-9 text-xs sm:text-sm"
                               >
-                                <span className="truncate">NÃO CORRIGIR</span>
+                                <span className="truncate">{correctionTarget}</span>
                                 <ChevronDown size={12} />
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                              <DropdownMenuItem>NÃO CORRIGIR</DropdownMenuItem>
-                              <DropdownMenuItem>TODOS OS ITENS</DropdownMenuItem>
-                              <DropdownMenuItem>ITENS SELECIONADOS</DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => setCorrectionTarget("NÃO CORRIGIR")}>
+                                NÃO CORRIGIR
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => setCorrectionTarget("TODOS OS ITENS")}>
+                                TODOS OS ITENS
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => setCorrectionTarget("ITENS SELECIONADOS")}>
+                                ITENS SELECIONADOS
+                              </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </div>
@@ -845,26 +1028,53 @@ export default function PriceBaskets() {
                                 variant="outline"
                                 className="w-full justify-between bg-gray-50 border-gray-200 text-gray-700 h-8 sm:h-9 text-xs sm:text-sm"
                               >
-                                <span className="truncate">Selecionar</span>
+                                <span className="truncate">{correctionIndex}</span>
                                 <ChevronDown size={12} />
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                              <DropdownMenuItem>IPCA</DropdownMenuItem>
-                              <DropdownMenuItem>INPC</DropdownMenuItem>
-                              <DropdownMenuItem>IGP-M</DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => setCorrectionIndex("IPCA")}>IPCA</DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => setCorrectionIndex("INPC")}>INPC</DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => setCorrectionIndex("IGP-M")}>IGP-M</DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </div>
                         <div>
                           <h4 className="text-xs uppercase text-gray-500 mb-1">DATA INICIAL</h4>
-                          <Button
-                            variant="outline"
-                            className="w-full justify-between bg-gray-50 border-gray-200 text-gray-700 h-8 sm:h-9 text-xs sm:text-sm"
-                          >
-                            <span className="truncate">Selecionar data</span>
-                            <CalendarIcon size={12} />
-                          </Button>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button
+                                variant="outline"
+                                className="w-full justify-between bg-gray-50 border-gray-200 text-gray-700 h-8 sm:h-9 text-xs sm:text-sm"
+                              >
+                                <span className="truncate">{correctionStartDate || "Selecionar data"}</span>
+                                <CalendarIcon size={12} />
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="start">
+                              <SimpleCalendar
+                                onSelectDate={(date) => setCorrectionStartDate(date)}
+                                onClose={() => {}}
+                              />
+                            </PopoverContent>
+                          </Popover>
+                        </div>
+                        <div>
+                          <h4 className="text-xs uppercase text-gray-500 mb-1">DATA FINAL</h4>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button
+                                variant="outline"
+                                className="w-full justify-between bg-gray-50 border-gray-200 text-gray-700 h-8 sm:h-9 text-xs sm:text-sm"
+                              >
+                                <span className="truncate">{correctionEndDate || "Selecionar data"}</span>
+                                <CalendarIcon size={12} />
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="start">
+                              <SimpleCalendar onSelectDate={(date) => setCorrectionEndDate(date)} onClose={() => {}} />
+                            </PopoverContent>
+                          </Popover>
                         </div>
                       </div>
                     </div>

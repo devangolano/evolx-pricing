@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef, type ChangeEvent } from "react"
 import { useNavigate, useParams } from "react-router-dom"
 import {
   Filter,
@@ -20,6 +20,12 @@ import {
   X,
   Barcode,
   Search,
+  PieChart,
+  Upload,
+  File,
+  FileIcon as FilePdf,
+  FileImage,
+  FileArchive,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -30,6 +36,7 @@ import { cn } from "@/lib/utils"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
+import { notify } from "@/config/toast"
 
 type StatusType = "EM ANDAMENTO" | "PRONTA" | "LIBERADA PARA CESTA" | "EM ABERTO"
 type SortOrder = "asc" | "desc"
@@ -59,16 +66,16 @@ interface BasketDetail {
   correctionStartDate?: string
   correctionEndDate?: string
   researchDocuments?: string
-  files?: {
-    name: string
-    size: string
-    sentDate: string
-  }[]
-  purchaseFiles?: {
-    name: string
-    size: string
-    sentDate: string
-  }[]
+  files?: FileItem[]
+  purchaseFiles?: FileItem[]
+}
+
+interface FileItem {
+  name: string
+  size: string
+  sentDate: string
+  type?: string
+  file?: File
 }
 
 // Update the existing allBasketsData declaration with the proper type
@@ -110,31 +117,19 @@ const allBasketsData: BasketDetail[] = [
         name: "MAPA DE APURAÇÃO DE PREÇOS.pdf",
         size: "282.65 KB",
         sentDate: "26/03/2025 20h08",
+        type: "pdf",
       },
       {
         name: "PESQUISAS UNIFICADAS.pdf",
         size: "209.39 KB",
         sentDate: "26/03/2025 20h08",
-      },
-      {
-        name: "PORTAL NACIONAL DE CONTRATAÇÕES PÚBLICAS.pdf",
-        size: "194.84 KB",
-        sentDate: "26/03/2025 20h08",
-      },
-      {
-        name: "PORTAL DA TRANSPARÊNCIA - CGU - NFE.pdf",
-        size: "194.87 KB",
-        sentDate: "26/03/2025 20h08",
-      },
-      {
-        name: "MAPA DE APURAÇÃO DE PREÇOS.xlsx",
-        size: "7.76 KB",
-        sentDate: "26/03/2025 20h08",
+        type: "pdf",
       },
       {
         name: "TERMO DE REFERÊNCIA.xlsx",
         size: "7.48 KB",
         sentDate: "26/03/2025 20h08",
+        type: "excel",
       },
     ],
     purchaseFiles: [
@@ -142,16 +137,13 @@ const allBasketsData: BasketDetail[] = [
         name: "ITMEDICA.pdf",
         size: "1.93 KB",
         sentDate: "18/03/2025 19h56",
-      },
-      {
-        name: "ARQUIVO PARA ORÇAMENTO - KIT HIGIENE BUCAL.pdf",
-        size: "88.88 KB",
-        sentDate: "18/03/2025 19h56",
+        type: "pdf",
       },
       {
         name: "JFB.pdf",
         size: "199.41 KB",
         sentDate: "18/03/2025 19h56",
+        type: "pdf",
       },
     ],
   },
@@ -287,10 +279,10 @@ function DocumentSearchModal({
 
   const filteredResults = searchTerm
     ? searchResults.filter(
-      (item) =>
-        item.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.description.toLowerCase().includes(searchTerm.toLowerCase()),
-    )
+        (item) =>
+          item.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          item.description.toLowerCase().includes(searchTerm.toLowerCase()),
+      )
     : searchResults
 
   return (
@@ -335,6 +327,220 @@ function DocumentSearchModal({
   )
 }
 
+// Componente para o modal de upload de arquivos
+function FileUploadModal({ onClose, onUpload }: { onClose: () => void; onUpload: (files: FileItem[]) => void }) {
+  const [selectedFiles, setSelectedFiles] = useState<FileItem[]>([])
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      const newFiles: FileItem[] = []
+
+      Array.from(e.target.files).forEach((file) => {
+        const now = new Date()
+        const formattedDate = `${String(now.getDate()).padStart(2, "0")}/${String(now.getMonth() + 1).padStart(2, "0")}/${now.getFullYear()} ${String(now.getHours()).padStart(2, "0")}h${String(now.getMinutes()).padStart(2, "0")}`
+
+        // Converter bytes para formato legível
+        const fileSize =
+          file.size < 1024
+            ? `${file.size} B`
+            : file.size < 1024 * 1024
+              ? `${(file.size / 1024).toFixed(2)} KB`
+              : `${(file.size / (1024 * 1024)).toFixed(2)} MB`
+
+        // Determinar o tipo de arquivo
+        const fileExtension = file.name.split(".").pop()?.toLowerCase() || ""
+        let fileType = "other"
+
+        if (["pdf"].includes(fileExtension)) fileType = "pdf"
+        else if (["doc", "docx"].includes(fileExtension)) fileType = "word"
+        else if (["xls", "xlsx"].includes(fileExtension)) fileType = "excel"
+        else if (["jpg", "jpeg", "png", "gif", "webp"].includes(fileExtension)) fileType = "image"
+        else if (["zip", "rar", "7z"].includes(fileExtension)) fileType = "archive"
+
+        newFiles.push({
+          name: file.name,
+          size: fileSize,
+          sentDate: formattedDate,
+          type: fileType,
+          file: file,
+        })
+      })
+
+      setSelectedFiles((prev) => [...prev, ...newFiles])
+    }
+  }
+
+  const handleRemoveFile = (index: number) => {
+    setSelectedFiles((prev) => prev.filter((_, i) => i !== index))
+  }
+
+  const handleUpload = () => {
+    onUpload(selectedFiles)
+    onClose()
+  }
+
+  const getFileIcon = (fileType: string | undefined) => {
+    switch (fileType) {
+      case "pdf":
+        return <FilePdf className="h-4 w-4 text-red-500" />
+      case "word":
+        return <FileText className="h-4 w-4 text-blue-500" />
+      case "excel":
+        return <FileSpreadsheet className="h-4 w-4 text-green-500" />
+      case "image":
+        return <FileImage className="h-4 w-4 text-purple-500" />
+      case "archive":
+        return <FileArchive className="h-4 w-4 text-yellow-500" />
+      default:
+        return <File className="h-4 w-4 text-gray-500" />
+    }
+  }
+
+  return (
+    <div className="p-4 space-y-4">
+      <div
+        className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center cursor-pointer hover:bg-gray-50 transition-colors"
+        onClick={() => fileInputRef.current?.click()}
+      >
+        <Upload className="h-8 w-8 mx-auto text-gray-400 mb-2" />
+        <p className="text-sm text-gray-600 mb-1">Clique para selecionar arquivos ou arraste e solte aqui</p>
+        <p className="text-xs text-gray-500">Suporta PDF, Word, Excel, imagens e outros formatos</p>
+        <input
+          type="file"
+          ref={fileInputRef}
+          className="hidden"
+          multiple
+          onChange={handleFileChange}
+          accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.gif,.zip,.rar"
+        />
+      </div>
+
+      {selectedFiles.length > 0 && (
+        <div className="border rounded-md divide-y max-h-60 overflow-y-auto">
+          {selectedFiles.map((file, index) => (
+            <div key={index} className="p-3 flex justify-between items-center">
+              <div className="flex items-center">
+                {getFileIcon(file.type)}
+                <span className="ml-2 text-sm truncate max-w-[200px]">{file.name}</span>
+              </div>
+              <div className="flex items-center">
+                <span className="text-xs text-gray-500 mr-2">{file.size}</span>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7 text-red-500 hover:text-red-700 hover:bg-gray-100"
+                  onClick={() => handleRemoveFile(index)}
+                >
+                  <Trash2 size={14} />
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="flex justify-end space-x-2 pt-2">
+        <Button variant="outline" onClick={onClose}>
+          Cancelar
+        </Button>
+        <Button
+          onClick={handleUpload}
+          disabled={selectedFiles.length === 0}
+          className="bg-[#7baa3d] hover:bg-[#6a9934] text-white"
+        >
+          Enviar {selectedFiles.length > 0 && `(${selectedFiles.length})`}
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+// Componente para visualizar arquivos
+function FileViewerModal({ file, onClose }: { file: FileItem; onClose: () => void }) {
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    // Simular carregamento do arquivo
+    const timer = setTimeout(() => {
+      setLoading(false)
+    }, 1000)
+
+    return () => clearTimeout(timer)
+  }, [])
+
+  return (
+    <div className="p-2 sm:p-4 space-y-2 sm:space-y-4">
+      <div className="flex justify-between items-center mb-2">
+        <h3 className="font-medium text-sm sm:text-base truncate max-w-[200px] sm:max-w-[400px]">{file.name}</h3>
+        <Button variant="ghost" size="icon" onClick={onClose}>
+          <X className="h-4 w-4" />
+        </Button>
+      </div>
+
+      <div className="border rounded-lg overflow-hidden bg-gray-100 h-[50vh] sm:h-[60vh] flex items-center justify-center">
+        {loading ? (
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-700 mx-auto mb-2"></div>
+            <p className="text-sm text-gray-600">Carregando documento...</p>
+          </div>
+        ) : file.type === "pdf" ? (
+          <div className="w-full h-full flex flex-col items-center justify-center p-4">
+            <FilePdf className="h-12 w-12 sm:h-16 sm:w-16 text-red-500 mb-4" />
+            <p className="text-sm text-gray-700 mb-2 text-center">Visualização de PDF</p>
+            <p className="text-xs text-gray-500 mb-4 text-center">
+              O arquivo PDF seria exibido aqui em um visualizador integrado
+            </p>
+            <Button
+              className="bg-[#7baa3d] hover:bg-[#6a9934] text-white"
+              onClick={() => {
+                notify.success(`Download do arquivo ${file.name} iniciado`)
+              }}
+            >
+              <Download className="h-4 w-4 mr-2" />
+              Baixar PDF
+            </Button>
+          </div>
+        ) : (
+          <div className="w-full h-full flex flex-col items-center justify-center p-4">
+            {getFileIcon(file.type)}
+            <p className="text-sm text-gray-700 mt-2 mb-4 text-center">
+              Este tipo de arquivo não pode ser visualizado diretamente
+            </p>
+            <Button
+              className="bg-[#7baa3d] hover:bg-[#6a9934] text-white"
+              onClick={() => {
+                notify.success(`Download do arquivo ${file.name} iniciado`)
+              }}
+            >
+              <Download className="h-4 w-4 mr-2" />
+              Baixar Arquivo
+            </Button>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// Função auxiliar para obter o ícone do arquivo com base no tipo
+const getFileIcon = (fileType: string | undefined) => {
+  switch (fileType) {
+    case "pdf":
+      return <FilePdf className="flex-shrink-0 text-red-500" />
+    case "word":
+      return <FileText className="flex-shrink-0 text-blue-500" />
+    case "excel":
+      return <FileSpreadsheet className="flex-shrink-0 text-green-500" />
+    case "image":
+      return <FileImage className="flex-shrink-0 text-purple-500" />
+    case "archive":
+      return <FileArchive className="flex-shrink-0 text-yellow-500" />
+    default:
+      return <File className="flex-shrink-0 text-gray-500" />
+  }
+}
+
 export default function PriceBaskets() {
   const navigate = useNavigate()
   const { id } = useParams<{ id: string }>()
@@ -342,11 +548,16 @@ export default function PriceBaskets() {
   const [selectedBasket, setSelectedBasket] = useState<BasketDetail | null>(null)
   const [filteredBaskets, setFilteredBaskets] = useState(allBasketsData)
   const [visibleBaskets, setVisibleBaskets] = useState<typeof allBasketsData>([])
-  const [itemsToShow, setItemsToShow] = useState(10)
+  const [itemsToShow, setItemsToShow] = useState(3)
   // Add state to control mobile view
   const [showDetailsMobile, setShowDetailsMobile] = useState(false)
   // Estado para controlar o modal de pesquisa de documentos
   const [isDocSearchOpen, setIsDocSearchOpen] = useState(false)
+  // Estados para controlar os modais de upload e visualização de arquivos
+  const [isFileUploadOpen, setIsFileUploadOpen] = useState(false)
+  const [fileUploadType, setFileUploadType] = useState<"basket" | "purchase">("basket")
+  const [selectedFile, setSelectedFile] = useState<FileItem | null>(null)
+  const [isFileViewerOpen, setIsFileViewerOpen] = useState(false)
 
   // Filtros
   const [statusFilter, setStatusFilter] = useState<StatusType | null>(null)
@@ -365,6 +576,9 @@ export default function PriceBaskets() {
   const [correctionEndDate, setCorrectionEndDate] = useState<string | null>(null)
   const [decimals, setDecimals] = useState<number>(selectedBasket?.decimals || 3)
   const [researchDocuments, setResearchDocuments] = useState<string>(selectedBasket?.researchDocuments || "")
+  // Estados para gerenciar os arquivos
+  const [basketFiles, setBasketFiles] = useState<FileItem[]>([])
+  const [purchaseFiles, setPurchaseFiles] = useState<FileItem[]>([])
 
   // Atualizar os estados quando o selectedBasket mudar
   useEffect(() => {
@@ -376,6 +590,8 @@ export default function PriceBaskets() {
       setExpenseElement(selectedBasket.expenseElement || "MATERIAL DE CONSUMO / MATERIAL DE HIGIENE")
       setContractType(selectedBasket.elementType || "LICITAÇÃO")
       setResearchDocuments(selectedBasket.researchDocuments || "")
+      setBasketFiles(selectedBasket.files || [])
+      setPurchaseFiles(selectedBasket.purchaseFiles || [])
     }
   }, [selectedBasket])
 
@@ -445,7 +661,7 @@ export default function PriceBaskets() {
   }
 
   const handleShowMore = () => {
-    setItemsToShow((prev) => prev + 5)
+    setItemsToShow((prev) => prev + 3)
   }
 
   const getStatusFilterText = () => {
@@ -475,8 +691,49 @@ export default function PriceBaskets() {
     }
   }
 
+  // Funções para gerenciar arquivos
+  const handleRemoveBasketFile = (index: number) => {
+    setBasketFiles((prev) => prev.filter((_, i) => i !== index))
+    notify.success("Arquivo removido com sucesso")
+  }
+
+  const handleRemovePurchaseFile = (index: number) => {
+    setPurchaseFiles((prev) => prev.filter((_, i) => i !== index))
+    notify.success("Arquivo removido com sucesso")
+  }
+
+  const handleAddFiles = (type: "basket" | "purchase") => {
+    setFileUploadType(type)
+    setIsFileUploadOpen(true)
+  }
+
+  const handleFileUpload = (files: FileItem[]) => {
+    if (fileUploadType === "basket") {
+      setBasketFiles((prev) => [...prev, ...files])
+    } else {
+      setPurchaseFiles((prev) => [...prev, ...files])
+    }
+
+    notify.success(`${files.length} arquivo(s) adicionado(s) com sucesso`)
+  }
+
+  const handleViewFile = (file: FileItem) => {
+    setSelectedFile(file)
+    setIsFileViewerOpen(true)
+  }
+
+  const handleDownloadFile = (file: FileItem) => {
+    // Simulação de download
+    notify.loading(`Preparando download de ${file.name}...`)
+
+    // Simular um pequeno atraso antes de mostrar o sucesso
+    setTimeout(() => {
+      notify.success(`Download do arquivo ${file.name} iniciado`)
+    }, 1500)
+  }
+
   return (
-    <div className="container mx-auto px-2 sm:px-4 py-3 sm:py-4 space-y-3 sm:space-y-4">
+    <div className="container mx-auto py-3 sm:py-4 space-y-3 sm:space-y-4">
       {/* Stats Cards - Hide when showing details on mobile */}
       <div className={`grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 ${showDetailsMobile ? "hidden sm:grid" : ""}`}>
         <div className="bg-white shadow rounded-lg p-2 sm:p-3">
@@ -540,7 +797,7 @@ export default function PriceBaskets() {
                 Todas as datas
               </Button>
             </div>
-            <SimpleCalendar onSelectDate={(date) => setDateFilter(date)} onClose={() => { }} />
+            <SimpleCalendar onSelectDate={(date) => setDateFilter(date)} onClose={() => {}} />
           </PopoverContent>
         </Popover>
 
@@ -574,8 +831,9 @@ export default function PriceBaskets() {
       <div className="flex flex-col md:flex-row gap-3 sm:gap-4">
         {/* Left Column - List - Hide when showing details on mobile */}
         <div
-          className={`w-full md:w-[345px] bg-white border border-gray-200 flex-shrink-0 flex flex-col rounded-lg overflow-hidden ${showDetailsMobile ? "hidden sm:flex" : "flex"
-            }`}
+          className={`w-full md:w-[345px] bg-white border border-gray-200 flex-shrink-0 flex flex-col rounded-lg overflow-hidden ${
+            showDetailsMobile ? "hidden sm:flex" : "flex"
+          }`}
         >
           <div className="p-2 sm:p-3 border-b border-gray-200">
             <Button className="w-full bg-[#7baa3d] hover:bg-[#6a9934] text-white h-8 sm:h-9 text-xs sm:text-sm">
@@ -641,8 +899,9 @@ export default function PriceBaskets() {
 
         {/* Right Column - Details - Show full width on mobile when a basket is selected */}
         <div
-          className={`flex-1 bg-white border border-gray-200 flex flex-col rounded-lg overflow-hidden ${!selectedBasket && !showDetailsMobile ? "hidden md:flex" : "flex w-full"
-            }`}
+          className={`flex-1 bg-white border border-gray-200 flex flex-col rounded-lg overflow-hidden ${
+            !selectedBasket && !showDetailsMobile ? "hidden md:flex" : "flex w-full"
+          }`}
         >
           {selectedBasket ? (
             <>
@@ -657,7 +916,7 @@ export default function PriceBaskets() {
                     <ChevronLeft size={14} className="mr-0 sm:mr-1" />
                   </Button>
                   <h2 className="text-base sm:text-lg font-medium text-gray-900 truncate">
-                    <span>Detalhes </span> 
+                    <span>Detalhes </span>
                   </h2>
                 </div>
                 <div className="flex space-x-1">
@@ -713,12 +972,15 @@ export default function PriceBaskets() {
                       <div>
                         <h3 className="text-xs font-semibold uppercase text-gray-500 mb-1">DOCUMENTOS DAS PESQUISAS</h3>
                         <div className="flex">
-                          <Input
-                            value={researchDocuments}
-                            onChange={(e) => setResearchDocuments(e.target.value)}
-                            className="flex-1 h-8 sm:h-9 text-xs sm:text-sm bg-gray-50 border-gray-200"
-                            placeholder="Código do documento"
-                          />
+                          <div className="relative flex-1">
+                            <FileText className="absolute left-2 top-1/2 transform -translate-y-1/2 h-3.5 w-3.5 text-gray-500" />
+                            <Input
+                              value={researchDocuments}
+                              onChange={(e) => setResearchDocuments(e.target.value)}
+                              className="flex-1 h-8 sm:h-9 text-xs sm:text-sm bg-gray-50 border-gray-200 pl-7"
+                              placeholder="Código do documento"
+                            />
+                          </div>
                           <Dialog open={isDocSearchOpen} onOpenChange={setIsDocSearchOpen}>
                             <DialogTrigger asChild>
                               <Button variant="outline" className="ml-1 h-8 sm:h-9 px-2 border-gray-200 text-gray-700">
@@ -747,8 +1009,9 @@ export default function PriceBaskets() {
                           <DropdownMenuTrigger asChild>
                             <Button
                               variant="outline"
-                              className="w-full justify-between bg-gray-50 border-gray-200 text-gray-700 h-8 sm:h-9 text-xs sm:text-sm"
+                              className="w-full justify-between bg-gray-50 border-gray-200 text-gray-700 h-8 sm:h-9 text-xs sm:text-sm pl-7 relative"
                             >
+                              <FileText className="absolute left-2 top-1/2 transform -translate-y-1/2 h-3.5 w-3.5 text-gray-500" />
                               <span className="truncate">{expenseElement}</span>
                               <ChevronDown size={12} />
                             </Button>
@@ -775,15 +1038,18 @@ export default function PriceBaskets() {
                           <DropdownMenuTrigger asChild>
                             <Button
                               variant="outline"
-                              className="w-full justify-between bg-gray-50 border-gray-200 text-gray-700 h-8 sm:h-9 text-xs sm:text-sm"
+                              className="w-full justify-between bg-gray-50 border-gray-200 text-gray-700 h-8 sm:h-9 text-xs sm:text-sm pl-7 relative"
                             >
+                              <List className="absolute left-2 top-1/2 transform -translate-y-1/2 h-3.5 w-3.5 text-gray-500" />
                               <span className="truncate">{contractType}</span>
                               <ChevronDown size={12} />
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
                             <DropdownMenuItem onClick={() => setContractType("LICITAÇÃO")}>LICITAÇÃO</DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => setContractType("DISPENSA/INEXIGIBILIDADE")}>DISPENSA/INEXIGIBILIDADE</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => setContractType("DISPENSA/INEXIGIBILIDADE")}>
+                              DISPENSA/INEXIGIBILIDADE
+                            </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </div>
@@ -793,8 +1059,9 @@ export default function PriceBaskets() {
                           <DropdownMenuTrigger asChild>
                             <Button
                               variant="outline"
-                              className="w-full justify-between bg-gray-50 border-gray-200 text-gray-700 h-8 sm:h-9 text-xs sm:text-sm"
+                              className="w-full justify-between bg-gray-50 border-gray-200 text-gray-700 h-8 sm:h-9 text-xs sm:text-sm pl-7 relative"
                             >
+                              <PieChart className="absolute left-2 top-1/2 transform -translate-y-1/2 h-3.5 w-3.5 text-gray-500" />
                               <span className="truncate">{calculationType}</span>
                               <ChevronDown size={12} />
                             </Button>
@@ -818,16 +1085,15 @@ export default function PriceBaskets() {
                         </div>
                       </div>
 
-
-
                       <div>
                         <h3 className="text-xs font-semibold uppercase text-gray-500 mb-1">SITUAÇÃO SUPORTE</h3>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button
                               variant="outline"
-                              className="w-full justify-between bg-gray-50 border-gray-200 text-gray-700 h-8 sm:h-9 text-xs sm:text-sm"
+                              className="w-full justify-between bg-gray-50 border-gray-200 text-gray-700 h-8 sm:h-9 text-xs sm:text-sm pl-7 relative"
                             >
+                              <Info className="absolute left-2 top-1/2 transform -translate-y-1/2 h-3.5 w-3.5 text-gray-500" />
                               <span className="truncate">{supportStatus}</span>
                               <ChevronDown size={12} />
                             </Button>
@@ -849,8 +1115,9 @@ export default function PriceBaskets() {
                           <DropdownMenuTrigger asChild>
                             <Button
                               variant="outline"
-                              className="w-full justify-between bg-gray-50 border-gray-200 text-gray-700 h-8 sm:h-9 text-xs sm:text-sm"
+                              className="w-full justify-between bg-gray-50 border-gray-200 text-gray-700 h-8 sm:h-9 text-xs sm:text-sm pl-7 relative"
                             >
+                              <User className="absolute left-2 top-1/2 transform -translate-y-1/2 h-3.5 w-3.5 text-gray-500" />
                               <span className="truncate">{clientStatus}</span>
                               <ChevronDown size={12} />
                             </Button>
@@ -867,27 +1134,83 @@ export default function PriceBaskets() {
                         </DropdownMenu>
                       </div>
 
-
                       <div>
                         <h3 className="text-xs font-semibold uppercase text-gray-500 mb-1">DATA DA FINALIZAÇÃO</h3>
-                        <div className="p-2 bg-gray-50 rounded-md text-xs sm:text-sm text-gray-700 border border-gray-200 h-8 sm:h-9 flex items-center">
-                          {selectedBasket.finalizedDate}
-                        </div>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="outline"
+                              className="w-full justify-between bg-gray-50 border-gray-200 text-gray-700 h-8 sm:h-9 text-xs sm:text-sm pl-7 relative"
+                            >
+                              <CalendarIcon className="absolute left-2 top-1/2 transform -translate-y-1/2 h-3.5 w-3.5 text-gray-500" />
+                              <span className="truncate">{selectedBasket.finalizedDate || "Selecionar data"}</span>
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0" align="start">
+                            <SimpleCalendar
+                              onSelectDate={(date) => {
+                                if (selectedBasket) {
+                                  const updatedBasket = { ...selectedBasket, finalizedDate: date }
+                                  setSelectedBasket(updatedBasket)
+                                }
+                              }}
+                              onClose={() => {}}
+                            />
+                          </PopoverContent>
+                        </Popover>
                       </div>
                       <div>
                         <h3 className="text-xs font-semibold uppercase text-gray-500 mb-1">DATA DA CESTA</h3>
-                        <div className="p-2 bg-gray-50 rounded-md text-xs sm:text-sm text-gray-700 border border-gray-200 h-8 sm:h-9 flex items-center">
-                          {selectedBasket.basketDate}
-                        </div>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="outline"
+                              className="w-full justify-between bg-gray-50 border-gray-200 text-gray-700 h-8 sm:h-9 text-xs sm:text-sm pl-7 relative"
+                            >
+                              <CalendarIcon className="absolute left-2 top-1/2 transform -translate-y-1/2 h-3.5 w-3.5 text-gray-500" />
+                              <span className="truncate">{selectedBasket.basketDate || "Selecionar data"}</span>
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0" align="start">
+                            <SimpleCalendar
+                              onSelectDate={(date) => {
+                                if (selectedBasket) {
+                                  const updatedBasket = { ...selectedBasket, basketDate: date }
+                                  setSelectedBasket(updatedBasket)
+                                }
+                              }}
+                              onClose={() => {}}
+                            />
+                          </PopoverContent>
+                        </Popover>
                       </div>
 
                       <div>
                         <h3 className="text-xs font-semibold uppercase text-gray-500 mb-1">
                           PRAZO PARA ENVIO DE COTAÇÕES
                         </h3>
-                        <div className="p-2 bg-gray-50 rounded-md text-xs sm:text-sm text-gray-700 border border-gray-200 h-8 sm:h-9 flex items-center">
-                          {selectedBasket.quotationDeadline || "Não definido"}
-                        </div>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="outline"
+                              className="w-full justify-between bg-gray-50 border-gray-200 text-gray-700 h-8 sm:h-9 text-xs sm:text-sm pl-7 relative"
+                            >
+                              <CalendarIcon className="absolute left-2 top-1/2 transform -translate-y-1/2 h-3.5 w-3.5 text-gray-500" />
+                              <span className="truncate">{selectedBasket.quotationDeadline || "Selecionar data"}</span>
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0" align="start">
+                            <SimpleCalendar
+                              onSelectDate={(date) => {
+                                if (selectedBasket) {
+                                  const updatedBasket = { ...selectedBasket, quotationDeadline: date }
+                                  setSelectedBasket(updatedBasket)
+                                }
+                              }}
+                              onClose={() => {}}
+                            />
+                          </PopoverContent>
+                        </Popover>
                       </div>
 
                       <div>
@@ -947,8 +1270,6 @@ export default function PriceBaskets() {
                           </div>
                         </div>
                       </div>
-
-
                     </div>
 
                     <div>
@@ -990,8 +1311,9 @@ export default function PriceBaskets() {
                             <DropdownMenuTrigger asChild>
                               <Button
                                 variant="outline"
-                                className="w-full justify-between bg-gray-50 border-gray-200 text-gray-700 h-8 sm:h-9 text-xs sm:text-sm"
+                                className="w-full justify-between bg-gray-50 border-gray-200 text-gray-700 h-8 sm:h-9 text-xs sm:text-sm pl-7 relative"
                               >
+                                <Filter className="absolute left-2 top-1/2 transform -translate-y-1/2 h-3.5 w-3.5 text-gray-500" />
                                 <span className="truncate">{correctionTarget}</span>
                                 <ChevronDown size={12} />
                               </Button>
@@ -1015,8 +1337,9 @@ export default function PriceBaskets() {
                             <DropdownMenuTrigger asChild>
                               <Button
                                 variant="outline"
-                                className="w-full justify-between bg-gray-50 border-gray-200 text-gray-700 h-8 sm:h-9 text-xs sm:text-sm"
+                                className="w-full justify-between bg-gray-50 border-gray-200 text-gray-700 h-8 sm:h-9 text-xs sm:text-sm pl-7 relative"
                               >
+                                <Barcode className="absolute left-2 top-1/2 transform -translate-y-1/2 h-3.5 w-3.5 text-gray-500" />
                                 <span className="truncate">{correctionIndex}</span>
                                 <ChevronDown size={12} />
                               </Button>
@@ -1034,16 +1357,16 @@ export default function PriceBaskets() {
                             <PopoverTrigger asChild>
                               <Button
                                 variant="outline"
-                                className="w-full justify-between bg-gray-50 border-gray-200 text-gray-700 h-8 sm:h-9 text-xs sm:text-sm"
+                                className="w-full justify-between bg-gray-50 border-gray-200 text-gray-700 h-8 sm:h-9 text-xs sm:text-sm pl-7 relative"
                               >
+                                <CalendarIcon className="absolute left-2 top-1/2 transform -translate-y-1/2 h-3.5 w-3.5 text-gray-500" />
                                 <span className="truncate">{correctionStartDate || "Selecionar data"}</span>
-                                <CalendarIcon size={12} />
                               </Button>
                             </PopoverTrigger>
                             <PopoverContent className="w-auto p-0" align="start">
                               <SimpleCalendar
                                 onSelectDate={(date) => setCorrectionStartDate(date)}
-                                onClose={() => { }}
+                                onClose={() => {}}
                               />
                             </PopoverContent>
                           </Popover>
@@ -1054,49 +1377,82 @@ export default function PriceBaskets() {
                             <PopoverTrigger asChild>
                               <Button
                                 variant="outline"
-                                className="w-full justify-between bg-gray-50 border-gray-200 text-gray-700 h-8 sm:h-9 text-xs sm:text-sm"
+                                className="w-full justify-between bg-gray-50 border-gray-200 text-gray-700 h-8 sm:h-9 text-xs sm:text-sm pl-7 relative"
                               >
+                                <CalendarIcon className="absolute left-2 top-1/2 transform -translate-y-1/2 h-3.5 w-3.5 text-gray-500" />
                                 <span className="truncate">{correctionEndDate || "Selecionar data"}</span>
-                                <CalendarIcon size={12} />
                               </Button>
                             </PopoverTrigger>
                             <PopoverContent className="w-auto p-0" align="start">
-                              <SimpleCalendar onSelectDate={(date) => setCorrectionEndDate(date)} onClose={() => { }} />
+                              <SimpleCalendar onSelectDate={(date) => setCorrectionEndDate(date)} onClose={() => {}} />
                             </PopoverContent>
                           </Popover>
                         </div>
                       </div>
                     </div>
 
-                    <div>
-                      <h3 className="text-xs font-semibold uppercase text-gray-500 mb-1">ARQUIVOS CESTA</h3>
+                    <div className="pt-4">
+                      <div className="flex justify-between items-center mb-1">
+                        <h3 className="text-xs font-semibold uppercase text-gray-500">ARQUIVOS CESTA</h3>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="text-blue-600 border-gray-200 hover:bg-gray-50 h-6 sm:h-7 text-[10px] sm:text-xs px-1.5 sm:px-2"
+                          onClick={() => handleAddFiles("basket")}
+                        >
+                          <Plus size={10} className="mr-1" />
+                          ADICIONAR
+                        </Button>
+                      </div>
                       <div className="space-y-2">
-                        {selectedBasket.files &&
-                          selectedBasket.files.map((file, index) => (
+                        {basketFiles.map((file, index) => (
+                          <div
+                            key={index}
+                            className="flex items-center justify-between p-2 bg-gray-50 rounded-md hover:bg-gray-100 transition-colors border border-gray-200"
+                          >
                             <div
-                              key={index}
-                              className="flex items-center justify-between p-2 bg-gray-50 rounded-md hover:bg-gray-100 transition-colors border border-gray-200"
+                              className="flex items-center flex-1 cursor-pointer truncate"
+                              onClick={() => handleViewFile(file)}
                             >
-                              <div className="flex items-center">
-                                <FileText size={12} className="text-red-500 mr-1 sm:mr-2 flex-shrink-0" />
-                                <span className="text-xs sm:text-sm text-gray-700 truncate max-w-[120px] sm:max-w-[200px] md:max-w-none">
-                                  {file.name}
-                                </span>
-                              </div>
-                              <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
-                                <span className="text-[10px] sm:text-xs text-gray-500 whitespace-nowrap">
-                                  {file.size} • {file.sentDate}
-                                </span>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-6 w-6 sm:h-7 sm:w-7 text-gray-500 hover:text-gray-700 hover:bg-gray-100"
-                                >
-                                  <Download size={12} />
-                                </Button>
-                              </div>
+                              {getFileIcon(file.type)}
+                              <span className="ml-2 text-xs sm:text-sm text-gray-700 truncate max-w-[120px] sm:max-w-[200px] md:max-w-none">
+                                {file.name}
+                              </span>
                             </div>
-                          ))}
+                            <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
+                              <span className="text-[10px] sm:text-xs text-gray-500 whitespace-nowrap hidden xs:inline">
+                                {file.size} • {file.sentDate}
+                              </span>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 sm:h-7 sm:w-7 text-gray-500 hover:text-gray-700 hover:bg-gray-100"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  handleDownloadFile(file)
+                                }}
+                              >
+                                <Download size={12} />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 sm:h-7 sm:w-7 text-red-500 hover:text-red-700 hover:bg-gray-100"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  handleRemoveBasketFile(index)
+                                }}
+                              >
+                                <Trash2 size={12} />
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                        {basketFiles.length === 0 && (
+                          <div className="p-3 text-center text-gray-500 text-xs border border-dashed border-gray-200 rounded-md">
+                            Nenhum arquivo adicionado
+                          </div>
+                        )}
                       </div>
                     </div>
 
@@ -1107,38 +1463,61 @@ export default function PriceBaskets() {
                           variant="outline"
                           size="sm"
                           className="text-blue-600 border-gray-200 hover:bg-gray-50 h-6 sm:h-7 text-[10px] sm:text-xs px-1.5 sm:px-2"
+                          onClick={() => handleAddFiles("purchase")}
                         >
                           <Plus size={10} className="mr-1" />
                           ADICIONAR
                         </Button>
                       </div>
                       <div className="space-y-2">
-                        {selectedBasket.purchaseFiles &&
-                          selectedBasket.purchaseFiles.map((file, index) => (
+                        {purchaseFiles.map((file, index) => (
+                          <div
+                            key={index}
+                            className="flex items-center justify-between p-2 bg-gray-50 rounded-md hover:bg-gray-100 transition-colors border border-gray-200"
+                          >
                             <div
-                              key={index}
-                              className="flex items-center justify-between p-2 bg-gray-50 rounded-md hover:bg-gray-100 transition-colors border border-gray-200"
+                              className="flex items-center flex-1 cursor-pointer truncate"
+                              onClick={() => handleViewFile(file)}
                             >
-                              <div className="flex items-center">
-                                <FileText size={12} className="text-red-500 mr-1 sm:mr-2 flex-shrink-0" />
-                                <span className="text-xs sm:text-sm text-gray-700 truncate max-w-[120px] sm:max-w-[200px] md:max-w-none">
-                                  {file.name}
-                                </span>
-                              </div>
-                              <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
-                                <span className="text-[10px] sm:text-xs text-gray-500 whitespace-nowrap">
-                                  {file.size} • {file.sentDate}
-                                </span>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-6 w-6 sm:h-7 sm:w-7 text-gray-500 hover:text-gray-700 hover:bg-gray-100"
-                                >
-                                  <Download size={12} />
-                                </Button>
-                              </div>
+                              {getFileIcon(file.type)}
+                              <span className="ml-2 text-xs sm:text-sm text-gray-700 truncate max-w-[120px] sm:max-w-[200px] md:max-w-none">
+                                {file.name}
+                              </span>
                             </div>
-                          ))}
+                            <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
+                              <span className="text-[10px] sm:text-xs text-gray-500 whitespace-nowrap hidden xs:inline">
+                                {file.size} • {file.sentDate}
+                              </span>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 sm:h-7 sm:w-7 text-gray-500 hover:text-gray-700 hover:bg-gray-100"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  handleDownloadFile(file)
+                                }}
+                              >
+                                <Download size={12} />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 sm:h-7 sm:w-7 text-red-500 hover:text-red-700 hover:bg-gray-100"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  handleRemovePurchaseFile(index)
+                                }}
+                              >
+                                <Trash2 size={12} />
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                        {purchaseFiles.length === 0 && (
+                          <div className="p-3 text-center text-gray-500 text-xs border border-dashed border-gray-200 rounded-md">
+                            Nenhum arquivo adicionado
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -1162,6 +1541,25 @@ export default function PriceBaskets() {
           )}
         </div>
       </div>
+
+      {/* Modais */}
+      <Dialog open={isFileUploadOpen} onOpenChange={setIsFileUploadOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Adicionar Arquivos</DialogTitle>
+          </DialogHeader>
+          <FileUploadModal onClose={() => setIsFileUploadOpen(false)} onUpload={handleFileUpload} />
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isFileViewerOpen} onOpenChange={setIsFileViewerOpen}>
+        <DialogContent className="sm:max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>Visualizar Arquivo</DialogTitle>
+          </DialogHeader>
+          {selectedFile && <FileViewerModal file={selectedFile} onClose={() => setIsFileViewerOpen(false)} />}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

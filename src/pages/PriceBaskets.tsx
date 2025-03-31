@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useNavigate, useParams, useLocation } from "react-router-dom"
+import { useNavigate, useParams } from "react-router-dom"
 import {
   Filter,
   CalendarIcon,
@@ -17,7 +17,6 @@ import {
   Download,
   User,
   FileSpreadsheet,
-  X,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -26,12 +25,6 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Checkbox } from "@/components/ui/checkbox"
 import { cn } from "@/lib/utils"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-
-// Dados de exemplo
-const statsData = [
-  { title: "Cestas Finalizadas", value: 25547 },
-  { title: "Cestas em andamento", value: 112 },
-]
 
 type StatusType = "EM ANDAMENTO" | "PRONTA" | "LIBERADA PARA CESTA" | "EM ABERTO"
 type SortOrder = "asc" | "desc"
@@ -264,16 +257,9 @@ function SimpleCalendar({ onSelectDate, onClose }: { onSelectDate: (date: string
   )
 }
 
-const STATUS_CONFIG = {
-  "EM ANDAMENTO": { label: "EM ANDAMENTO", color: "bg-blue-500 hover:bg-blue-600" },
-  PRONTA: { label: "PRONTA", color: "bg-green-500 hover:bg-green-600" },
-  "LIBERADA PARA CESTA": { label: "LIBERADA PARA CESTA", color: "bg-purple-500 hover:bg-purple-600" },
-  "EM ABERTO": { label: "EM ABERTO", color: "bg-yellow-500 hover:bg-yellow-600" },
-}
 
 export default function PriceBaskets() {
   const navigate = useNavigate()
-  const location = useLocation()
   const { id } = useParams<{ id: string }>()
 
   const [selectedBasket, setSelectedBasket] = useState<BasketDetail | null>(null)

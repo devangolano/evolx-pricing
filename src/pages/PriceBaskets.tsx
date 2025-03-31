@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useNavigate, useParams, useLocation } from "react-router-dom"
+import { useNavigate, useParams } from "react-router-dom"
 import {
   Filter,
   CalendarIcon,
@@ -33,7 +33,7 @@ import { Input } from "@/components/ui/input"
 
 type StatusType = "EM ANDAMENTO" | "PRONTA" | "LIBERADA PARA CESTA" | "EM ABERTO"
 type SortOrder = "asc" | "desc"
-type ContractType = "LICITAÇÃO" | "DISPENSA/INEXIGIBILIDADE" 
+type ContractType = "LICITAÇÃO" | "DISPENSA/INEXIGIBILIDADE"
 
 // Atualizar a interface BasketDetail para incluir todos os campos exibidos na página de detalhes
 interface BasketDetail {
@@ -277,7 +277,7 @@ function DocumentSearchModal({
   onSelect,
 }: { isOpen: boolean; onClose: () => void; onSelect: (code: string) => void }) {
   const [searchTerm, setSearchTerm] = useState("")
-  const [searchResults, setSearchResults] = useState([
+  const [searchResults] = useState([
     { code: "DOC-2025-0441", description: "Pesquisa de Preços - Kits de Higiene Bucal" },
     { code: "DOC-2025-0442", description: "Pesquisa de Preços - Material Escolar" },
     { code: "DOC-2025-0443", description: "Pesquisa de Preços - Equipamentos de Informática" },
@@ -287,10 +287,10 @@ function DocumentSearchModal({
 
   const filteredResults = searchTerm
     ? searchResults.filter(
-        (item) =>
-          item.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          item.description.toLowerCase().includes(searchTerm.toLowerCase()),
-      )
+      (item) =>
+        item.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.description.toLowerCase().includes(searchTerm.toLowerCase()),
+    )
     : searchResults
 
   return (
@@ -335,16 +335,8 @@ function DocumentSearchModal({
   )
 }
 
-const STATUS_CONFIG = {
-  "EM ANDAMENTO": { label: "EM ANDAMENTO", color: "bg-blue-500 hover:bg-blue-600" },
-  PRONTA: { label: "PRONTA", color: "bg-green-500 hover:bg-green-600" },
-  "LIBERADA PARA CESTA": { label: "LIBERADA PARA CESTA", color: "bg-purple-500 hover:bg-purple-600" },
-  "EM ABERTO": { label: "EM ABERTO", color: "bg-yellow-500 hover:bg-yellow-600" },
-}
-
 export default function PriceBaskets() {
   const navigate = useNavigate()
-  const location = useLocation()
   const { id } = useParams<{ id: string }>()
 
   const [selectedBasket, setSelectedBasket] = useState<BasketDetail | null>(null)
@@ -548,7 +540,7 @@ export default function PriceBaskets() {
                 Todas as datas
               </Button>
             </div>
-            <SimpleCalendar onSelectDate={(date) => setDateFilter(date)} onClose={() => {}} />
+            <SimpleCalendar onSelectDate={(date) => setDateFilter(date)} onClose={() => { }} />
           </PopoverContent>
         </Popover>
 
@@ -571,20 +563,19 @@ export default function PriceBaskets() {
 
         <Button
           variant="ghost"
-          className="text-destructive hover:text-destructive hover:bg-destructive/10 h-8 sm:h-9 text-xs sm:text-sm px-2 sm:px-3"
+          className="text-destructive hover:text-destructive bg-destructive/10 h-8 sm:h-9 text-xs sm:text-sm px-2 sm:px-3"
           onClick={handleClearFilters}
         >
           <X className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
-          <span className="hidden xs:inline">Limpar Filtros</span>
+          Limpar Filtros
         </Button>
       </div>
 
       <div className="flex flex-col md:flex-row gap-3 sm:gap-4">
         {/* Left Column - List - Hide when showing details on mobile */}
         <div
-          className={`w-full md:w-[345px] bg-white border border-gray-200 flex-shrink-0 flex flex-col rounded-lg overflow-hidden ${
-            showDetailsMobile ? "hidden sm:flex" : "flex"
-          }`}
+          className={`w-full md:w-[345px] bg-white border border-gray-200 flex-shrink-0 flex flex-col rounded-lg overflow-hidden ${showDetailsMobile ? "hidden sm:flex" : "flex"
+            }`}
         >
           <div className="p-2 sm:p-3 border-b border-gray-200">
             <Button className="w-full bg-[#7baa3d] hover:bg-[#6a9934] text-white h-8 sm:h-9 text-xs sm:text-sm">
@@ -650,9 +641,8 @@ export default function PriceBaskets() {
 
         {/* Right Column - Details - Show full width on mobile when a basket is selected */}
         <div
-          className={`flex-1 bg-white border border-gray-200 flex flex-col rounded-lg overflow-hidden ${
-            !selectedBasket && !showDetailsMobile ? "hidden md:flex" : "flex w-full"
-          }`}
+          className={`flex-1 bg-white border border-gray-200 flex flex-col rounded-lg overflow-hidden ${!selectedBasket && !showDetailsMobile ? "hidden md:flex" : "flex w-full"
+            }`}
         >
           {selectedBasket ? (
             <>
@@ -665,10 +655,9 @@ export default function PriceBaskets() {
                     className="mr-2 text-gray-700 hover:bg-gray-100 flex items-center h-7 sm:h-8 px-1 sm:px-2 text-xs sm:text-sm"
                   >
                     <ChevronLeft size={14} className="mr-0 sm:mr-1" />
-                    <span className="hidden sm:inline">Voltar</span>
                   </Button>
                   <h2 className="text-base sm:text-lg font-medium text-gray-900 truncate">
-                    <span className="hidden sm:inline">Detalhes da Cesta</span> #{selectedBasket.id}
+                    <span>Detalhes </span> 
                   </h2>
                 </div>
                 <div className="flex space-x-1">
@@ -829,8 +818,8 @@ export default function PriceBaskets() {
                         </div>
                       </div>
 
-                     
-                      
+
+
                       <div>
                         <h3 className="text-xs font-semibold uppercase text-gray-500 mb-1">SITUAÇÃO SUPORTE</h3>
                         <DropdownMenu>
@@ -878,7 +867,7 @@ export default function PriceBaskets() {
                         </DropdownMenu>
                       </div>
 
-                      
+
                       <div>
                         <h3 className="text-xs font-semibold uppercase text-gray-500 mb-1">DATA DA FINALIZAÇÃO</h3>
                         <div className="p-2 bg-gray-50 rounded-md text-xs sm:text-sm text-gray-700 border border-gray-200 h-8 sm:h-9 flex items-center">
@@ -893,14 +882,14 @@ export default function PriceBaskets() {
                       </div>
 
                       <div>
-                      <h3 className="text-xs font-semibold uppercase text-gray-500 mb-1">
-                        PRAZO PARA ENVIO DE COTAÇÕES
-                      </h3>
-                      <div className="p-2 bg-gray-50 rounded-md text-xs sm:text-sm text-gray-700 border border-gray-200 h-8 sm:h-9 flex items-center">
-                        {selectedBasket.quotationDeadline || "Não definido"}
+                        <h3 className="text-xs font-semibold uppercase text-gray-500 mb-1">
+                          PRAZO PARA ENVIO DE COTAÇÕES
+                        </h3>
+                        <div className="p-2 bg-gray-50 rounded-md text-xs sm:text-sm text-gray-700 border border-gray-200 h-8 sm:h-9 flex items-center">
+                          {selectedBasket.quotationDeadline || "Não definido"}
+                        </div>
                       </div>
-                    </div>
-                    
+
                       <div>
                         <h3 className="text-xs font-semibold uppercase text-gray-500 mb-1">POSSE</h3>
                         <div className="flex items-center">
@@ -959,7 +948,7 @@ export default function PriceBaskets() {
                         </div>
                       </div>
 
-                    
+
                     </div>
 
                     <div>
@@ -1054,7 +1043,7 @@ export default function PriceBaskets() {
                             <PopoverContent className="w-auto p-0" align="start">
                               <SimpleCalendar
                                 onSelectDate={(date) => setCorrectionStartDate(date)}
-                                onClose={() => {}}
+                                onClose={() => { }}
                               />
                             </PopoverContent>
                           </Popover>
@@ -1072,7 +1061,7 @@ export default function PriceBaskets() {
                               </Button>
                             </PopoverTrigger>
                             <PopoverContent className="w-auto p-0" align="start">
-                              <SimpleCalendar onSelectDate={(date) => setCorrectionEndDate(date)} onClose={() => {}} />
+                              <SimpleCalendar onSelectDate={(date) => setCorrectionEndDate(date)} onClose={() => { }} />
                             </PopoverContent>
                           </Popover>
                         </div>

@@ -1,5 +1,4 @@
-import { Layout } from "../components/layout/Layout";
-import { RefreshCw, Trash2, Copy, SaveAll, Eye, EyeOff } from "lucide-react";
+import { RefreshCw, Trash2, Copy, SaveAll, Eye, EyeOff, Lock } from "lucide-react";
 import { useState, useRef } from "react";
 import { notify } from "../config/toast";
 
@@ -83,7 +82,7 @@ export function Profile() {
   };
 
   return (
-    <Layout>
+    <>
       <div className="flex justify-between items-center p-4 shadow-lg bg-white border-b border-[#e0e0e0]">
         <h1 className="text-xl font-medium text-[#302f2f]">Editar perfil</h1>
         <button 
@@ -178,12 +177,13 @@ export function Profile() {
             <div className="col-span-2 sm:col-span-1">
               <label className="block text-sm text-[#646464] mb-1">SENHA ATUAL</label>
               <div className="relative">
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-[#646464] w-4 h-4" />
                 <input
                   type={showPasswords.current ? "text" : "password"}
                   name="currentPassword"
                   value={formData.currentPassword}
                   onChange={handleInputChange}
-                  className="w-full rounded px-3 py-2 text-[#2c2c2c] border pr-10"
+                  className="w-full rounded px-3 py-2 text-[#2c2c2c] border pr-10 pl-9"
                 />
                 <button
                   type="button"
@@ -198,12 +198,13 @@ export function Profile() {
             <div className="col-span-2 sm:col-span-1">
               <label className="block text-sm text-[#646464] mb-1">NOVA SENHA</label>
               <div className="relative">
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-[#646464] w-4 h-4" />
                 <input
                   type={showPasswords.new ? "text" : "password"}
                   name="newPassword"
                   value={formData.newPassword}
                   onChange={handleInputChange}
-                  className="w-full rounded px-3 py-2 text-[#2c2c2c] border pr-10"
+                  className="w-full rounded px-3 py-2 text-[#2c2c2c] border pr-10 pl-9"
                 />
                 <button
                   type="button"
@@ -217,6 +218,6 @@ export function Profile() {
           </div>
         </div>
       </div>
-    </Layout>
+    </>
   );
 }

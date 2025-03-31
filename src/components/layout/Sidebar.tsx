@@ -1,5 +1,6 @@
 import { Clock, LayoutGrid, Heart, MessageSquare, FileText, ClipboardList, Settings, LogOut, X } from "lucide-react"
 import { useState, useEffect } from "react"
+import { Link, useLocation } from "react-router-dom"
 
 type SidebarProps = {
   isOpen?: boolean;
@@ -8,6 +9,7 @@ type SidebarProps = {
 
 export function Sidebar({ isOpen = true, onClose }: SidebarProps) {
   const [isMobile, setIsMobile] = useState(false);
+  const location = useLocation();
 
   useEffect(() => {
     const checkScreenSize = () => {
@@ -31,6 +33,21 @@ export function Sidebar({ isOpen = true, onClose }: SidebarProps) {
     ? "fixed inset-y-0 left-0 z-50 w-[242px] bg-white flex flex-col h-full shadow-lg transform transition-transform duration-300 ease-in-out"
     : "w-[242px] bg-white flex flex-col h-full";
 
+  const menuItems = [
+    { icon: Clock, label: "Página Inicial", path: "/inicio" },
+    { icon: LayoutGrid, label: "Cestas de Preços", path: "/cestas-precos" },
+    { icon: Heart, label: "Cestas", path: "/cestas" },
+    { icon: MessageSquare, label: "Atendimento", path: "/atendimento" },
+    { icon: FileText, label: "Catálogo de Preços", path: "/catalogo-precos" },
+    { icon: ClipboardList, label: "Catálogo de Produtos", path: "/catalogo-produtos" },
+  ];
+
+  const handleLogout = () => {
+    // Add your logout logic here
+    localStorage.removeItem('token'); // or any other auth token you're using
+    window.location.href = '/auth/login';
+  };
+
   return (
     <aside className={sidebarClasses}>
       {isMobile && (
@@ -46,42 +63,23 @@ export function Sidebar({ isOpen = true, onClose }: SidebarProps) {
       
       <nav className="flex-1 p-4">
         <ul className="space-y-2">
-          <li className="flex items-center text-[#333333] hover:bg-[#333333] hover:text-white cursor-pointer p-2 rounded">
-            <div className="w-6 h-6 mr-2 flex items-center justify-center">
-              <Clock className="w-5 h-5" />
-            </div>
-            <span className="text-sm">Página Inicial</span>
-          </li>
-          <li className="flex items-center bg-[#333333] text-white cursor-pointer p-2 rounded">
-            <div className="w-6 h-6 mr-2 flex items-center justify-center">
-              <LayoutGrid className="w-5 h-5" />
-            </div>
-            <span className="text-sm">Cestas de Preços</span>
-          </li>
-          <li className="flex items-center text-[#333333] hover:bg-[#333333] hover:text-white cursor-pointer p-2 rounded">
-            <div className="w-6 h-6 mr-2 flex items-center justify-center">
-              <Heart className="w-5 h-5" />
-            </div>
-            <span className="text-sm">Cestas</span>
-          </li>
-          <li className="flex items-center text-[#333333] hover:bg-[#333333] hover:text-white cursor-pointer p-2 rounded">
-            <div className="w-6 h-6 mr-2 flex items-center justify-center">
-              <MessageSquare className="w-5 h-5" />
-            </div>
-            <span className="text-sm">Atendimento</span>
-          </li>
-          <li className="flex items-center text-[#333333] hover:bg-[#333333] hover:text-white cursor-pointer p-2 rounded">
-            <div className="w-6 h-6 mr-2 flex items-center justify-center">
-              <FileText className="w-5 h-5" />
-            </div>
-            <span className="text-sm">Catálogo de Preços</span>
-          </li>
-          <li className="flex items-center text-[#333333] hover:bg-[#333333] hover:text-white cursor-pointer p-2 rounded">
-            <div className="w-6 h-6 mr-2 flex items-center justify-center">
-              <ClipboardList className="w-5 h-5" />
-            </div>
-            <span className="text-sm">Catálogo de Produtos</span>
-          </li>
+          {menuItems.map((item) => (
+            <li key={item.path}>
+              <Link
+                to={item.path}
+                className={`flex items-center ${
+                  location.pathname === item.path
+                    ? "bg-[#333333] text-white"
+                    : "text-[#333333] hover:bg-[#333333] hover:text-white"
+                } cursor-pointer p-2 rounded`}
+              >
+                <div className="w-6 h-6 mr-2 flex items-center justify-center">
+                  <item.icon className="w-5 h-5" />
+                </div>
+                <span className="text-sm">{item.label}</span>
+              </Link>
+            </li>
+          ))}
         </ul>
       </nav>
 
@@ -99,13 +97,23 @@ export function Sidebar({ isOpen = true, onClose }: SidebarProps) {
         </div>
 
         <ul className="space-y-2">
-          <li className="flex items-center text-[#333333] text-sm hover:bg-[#333333] hover:text-white cursor-pointer p-2 rounded">
-            <Settings className="w-5 h-5 mr-2" />
-            <span>Configurações</span>
+          <li>
+            <Link
+              to="/configuracoes"
+              className="flex items-center text-[#333333] text-sm hover:bg-[#333333] hover:text-white cursor-pointer p-2 rounded"
+            >
+              <Settings className="w-5 h-5 mr-2" />
+              <span>Configurações</span>
+            </Link>
           </li>
-          <li className="flex items-center text-[#333333] text-sm hover:bg-[#333333] hover:text-white cursor-pointer p-2 rounded">
-            <LogOut className="w-5 h-5 mr-2" />
-            <span>sair</span>
+          <li>
+            <button
+              onClick={handleLogout}
+              className="w-full flex items-center text-[#333333] text-sm hover:bg-[#333333] hover:text-white cursor-pointer p-2 rounded"
+            >
+              <LogOut className="w-5 h-5 mr-2" />
+              <span>Sair</span>
+            </button>
           </li>
         </ul>
       </div>

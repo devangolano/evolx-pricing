@@ -26,6 +26,7 @@ import {
   FileIcon as FilePdf,
   FileImage,
   FileArchive,
+  RefreshCcw,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -106,7 +107,7 @@ const allBasketsData: BasketDetail[] = [
     userNumber: "1",
     elementType: "LICITAÇÃO",
     calculationType: "MÉDIA ARITMÉTICA",
-    decimals: 3,
+    decimals: 4,
     supportStatus: "FINALIZADA",
     clientStatus: "PRONTA",
     possession: "CLIENTE",
@@ -1254,7 +1255,7 @@ export default function PriceBaskets() {
                             size="icon"
                             className="h-6 w-6 sm:h-7 sm:w-7 border-gray-200 text-gray-700 hover:bg-gray-50"
                           >
-                            <Plus size={10} />
+                            <RefreshCcw size={10} />
                           </Button>
                         </div>
                       </div>

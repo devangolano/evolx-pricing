@@ -37,6 +37,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { notify } from "@/config/toast"
+import { NewBasketFormContent } from "@/pages/new-basket-form"
 
 type StatusType = "EM ANDAMENTO" | "PRONTA" | "LIBERADA PARA CESTA" | "EM ABERTO"
 type SortOrder = "asc" | "desc"
@@ -544,6 +545,7 @@ const getFileIcon = (fileType: string | undefined) => {
 export default function PriceBaskets() {
   const navigate = useNavigate()
   const { id } = useParams<{ id: string }>()
+  const [isNewBasketMode, setIsNewBasketMode] = useState(false)
 
   const [selectedBasket, setSelectedBasket] = useState<BasketDetail | null>(null)
   const [filteredBaskets, setFilteredBaskets] = useState(allBasketsData)
@@ -598,11 +600,20 @@ export default function PriceBaskets() {
   // Atualizar a cesta selecionada quando o ID na URL mudar
   useEffect(() => {
     if (id) {
-      const basket = allBasketsData.find((basket) => basket.id === id)
-      setSelectedBasket(basket || null)
-      // Show details on mobile when ID is in URL
-      setShowDetailsMobile(!!basket)
+      if (id === "novo") {
+        setIsNewBasketMode(true)
+        setSelectedBasket(null)
+        // Don't hide the basket listing on desktop
+        setShowDetailsMobile(false)
+      } else {
+        setIsNewBasketMode(false)
+        const basket = allBasketsData.find((basket) => basket.id === id)
+        setSelectedBasket(basket || null)
+        // Show details on mobile when ID is in URL
+        setShowDetailsMobile(!!basket)
+      }
     } else {
+      setIsNewBasketMode(false)
       setSelectedBasket(null)
       // Hide details on mobile when no ID in URL
       setShowDetailsMobile(false)
@@ -643,8 +654,16 @@ export default function PriceBaskets() {
     // Atualizar a URL quando uma cesta for selecionada
     navigate(`/basket/${basket.id}`)
     setSelectedBasket(basket)
+    setIsNewBasketMode(false)
     // Show details on mobile when basket is clicked
     setShowDetailsMobile(true)
+  }
+
+  const handleNewBasketClick = () => {
+    setIsNewBasketMode(true)
+    setSelectedBasket(null)
+    // Don't navigate to a new URL
+    // navigate("/cestas-precos/novo")
   }
 
   // Add handler to go back to list on mobile
@@ -652,6 +671,7 @@ export default function PriceBaskets() {
     navigate("/cestas-precos")
     setSelectedBasket(null)
     setShowDetailsMobile(false)
+    setIsNewBasketMode(false)
   }
 
   const handleClearFilters = () => {
@@ -836,7 +856,10 @@ export default function PriceBaskets() {
           }`}
         >
           <div className="p-2 sm:p-3 border-b border-gray-200">
-            <Button className="w-full bg-[#7baa3d] hover:bg-[#6a9934] text-white h-8 sm:h-9 text-xs sm:text-sm">
+            <Button
+              className="w-full bg-[#7baa3d] hover:bg-[#6a9934] text-white h-8 sm:h-9 text-xs sm:text-sm"
+              onClick={handleNewBasketClick}
+            >
               <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
               NOVA CESTA
             </Button>
@@ -897,13 +920,17 @@ export default function PriceBaskets() {
           </ScrollArea>
         </div>
 
-        {/* Right Column - Details - Show full width on mobile when a basket is selected */}
-        <div
-          className={`flex-1 bg-white border border-gray-200 flex flex-col rounded-lg overflow-hidden ${
-            !selectedBasket && !showDetailsMobile ? "hidden md:flex" : "flex w-full"
-          }`}
-        >
-          {selectedBasket ? (
+        {/* Right Column - Details or New Basket Form */}
+        <div className="flex-1 bg-white border border-gray-200 flex flex-col rounded-lg overflow-hidden">
+          {isNewBasketMode ? (
+            <NewBasketFormContent
+              onSave={() => {
+                notify.success("Cesta cadastrada com sucesso!")
+                setIsNewBasketMode(false)
+              }}
+              onCancel={() => setIsNewBasketMode(false)}
+            />
+          ) : selectedBasket ? (
             <>
               {/* Header with back button */}
               <div className="bg-gray-50 p-2 sm:p-3 border-b border-gray-200 flex justify-between items-center sticky top-0 z-10">

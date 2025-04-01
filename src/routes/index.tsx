@@ -10,6 +10,7 @@ import { Support } from '../pages/Support';
 import { PriceCatalog } from '../pages/PriceCatalog';
 import { ProductCatalog } from '../pages/ProductCatalog';
 import { Settings } from '../pages/Settings';
+import NewBasketForm from '@/pages/new-basket-form';
 
 export const router = createBrowserRouter([
   {
@@ -39,6 +40,10 @@ export const router = createBrowserRouter([
       {
         path: '/cestas-precos',
         element: <PriceBaskets />,
+      },
+      {
+        path: '/cestas-precos/novo',
+        element: <NewBasketForm />, 
       },
       {
         path: '/basket/:id',

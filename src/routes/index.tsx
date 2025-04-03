@@ -1,4 +1,5 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom';
+import { PrivateRoute } from '../components/PrivateRoute';
 import Entrar from '../pages/auth/Login';
 import Criar from '../pages/auth/Criar';
 import Dashboard from '../pages/dashboard/Index';
@@ -15,7 +16,7 @@ import NewBasketForm from '@/pages/new-basket-form';
 export const router = createBrowserRouter([
   {
     path: '/',
-    element: <Navigate to="/auth/entrar" replace />,
+    element: <Navigate to="/inicio" replace />,
   },
   {
     path: '/auth',
@@ -31,12 +32,12 @@ export const router = createBrowserRouter([
     ]
   },
   {
-    element: <Layout />,
+    element: (
+      <PrivateRoute>
+        <Layout />
+      </PrivateRoute>
+    ),
     children: [
-      {
-        path: '/',
-        element: <Dashboard />,
-      },
       {
         path: '/inicio',
         element: <Dashboard />,

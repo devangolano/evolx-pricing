@@ -2,14 +2,14 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { User2, Lock, Building2, Loader2 } from "lucide-react"
 import axios from "axios"
 import { useNavigate } from "react-router-dom"
 import { notify } from "../../config/toast"; // Add this import
 
 const api = axios.create({
-  baseURL: "http://localhost:3000", // Direct URL instead of env variable for now
+  baseURL: "http://localhost:3000",
   headers: {
     "Content-Type": "application/json",
   },
@@ -89,6 +89,14 @@ function App() {
     }
   }
 
+  useEffect(() => {
+    const token = localStorage.getItem('token'); // Changed from env variable
+    const user = localStorage.getItem('user');
+    if (token && user) {
+      navigate('/inicio');
+    }
+  }, [navigate]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
@@ -104,7 +112,11 @@ function App() {
   
       const { token, user } = response.data;
       
-      localStorage.setItem(import.meta.env.VITE_AUTH_TOKEN, token);
+      // Store token without env variable
+      localStorage.setItem('token', token);
+      localStorage.setItem('user', JSON.stringify(user));
+      
+      // Set authorization header for future requests
       api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
       
       if (rememberMe) {
@@ -113,11 +125,11 @@ function App() {
         localStorage.removeItem('remember_user');
       }
   
-      notify.success("Login realizado com sucesso!"); // Add success notification
-      navigate('/inicio');
+      notify.success("Login realizado com sucesso!");
+      navigate('/inicio', { replace: true });
     } catch (err: any) {
       const errorMessage = err.response?.data?.message || "Erro ao fazer login. Tente novamente.";
-      notify.error(errorMessage); // Add error notification
+      notify.error(errorMessage);
       setError(errorMessage);
     } finally {
       setIsLoading(false);
@@ -186,7 +198,7 @@ function App() {
                   </option>
                   {!isPrefectureLoading && prefectures.map((pref) => (
                     <option key={pref.id} value={pref.prefecture}>
-                      {pref.prefecture}
+                     <span>Pref -</span> {pref.prefecture}
                     </option>
                   ))}
                 </select>

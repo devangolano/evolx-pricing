@@ -4,7 +4,7 @@ import { notify } from "../config/toast";
 import axios from "axios";
 
 const api = axios.create({
-  baseURL: "http://localhost:3000",
+  baseURL: "https://ovolx-api-1.onrender.com",
   headers: {
     "Content-Type": "application/json",
   },
@@ -101,8 +101,6 @@ export function Profile() {
         updateData.newPassword = formData.newPassword;
       }
 
-      // Ajustado para usar o prefixo /auth nas rotas
-      const response = await api.put('/auth/users/profile', updateData);
 
       notify.success("Perfil atualizado com sucesso!");
       setFormData(prev => ({

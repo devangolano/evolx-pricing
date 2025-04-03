@@ -9,7 +9,7 @@ import { useNavigate } from "react-router-dom"
 import { notify } from "../../config/toast"; // Add this import
 
 const api = axios.create({
-  baseURL: "http://localhost:3000",
+  baseURL: "https://ovolx-api-1.onrender.com",
   headers: {
     "Content-Type": "application/json",
   },

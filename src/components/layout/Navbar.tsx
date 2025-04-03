@@ -8,7 +8,7 @@ import axios from "axios"
 
 // Configuração da API
 const api = axios.create({
-  baseURL: "http://localhost:3000",
+  baseURL: "https://ovolx-api-1.onrender.com",
   headers: {
     "Content-Type": "application/json",
   },

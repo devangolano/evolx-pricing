@@ -1,4 +1,4 @@
-import { createBrowserRouter } from 'react-router-dom';
+import { createBrowserRouter, Navigate } from 'react-router-dom';
 import Entrar from '../pages/auth/Login';
 import Criar from '../pages/auth/Criar';
 import Dashboard from '../pages/dashboard/Index';
@@ -13,6 +13,10 @@ import { Settings } from '../pages/Settings';
 import NewBasketForm from '@/pages/new-basket-form';
 
 export const router = createBrowserRouter([
+  {
+    path: '/',
+    element: <Navigate to="/auth/entrar" replace />,
+  },
   {
     path: '/auth',
     children: [

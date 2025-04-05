@@ -47,7 +47,7 @@ export interface FileItem {
 // Função para buscar todas as cestas
 export const fetchBaskets = async (): Promise<BasketDetail[]> => {
   try {
-    const response = await fetch("http://localhost:3000/api/baskets", {
+    const response = await fetch("https://ovolx-api-1.onrender.com/api/baskets", {
       headers: {
         Authorization: `Bearer ${localStorage.getItem("token")}`,
       },
@@ -99,7 +99,7 @@ export const fetchBaskets = async (): Promise<BasketDetail[]> => {
 // Função para buscar uma cesta específica por ID
 export const fetchBasketById = async (id: string): Promise<BasketDetail> => {
   try {
-    const response = await fetch(`http://localhost:3000/api/baskets/${id}`, {
+    const response = await fetch(`https://ovolx-api-1.onrender.com/api/baskets/${id}`, {
       headers: {
         Authorization: `Bearer ${localStorage.getItem("token")}`,
       },
@@ -161,7 +161,7 @@ export const updateBasket = async (id: string, data: Partial<BasketDetail>): Pro
       {} as Record<string, any>,
     )
 
-    const response = await fetch(`http://localhost:3000/api/baskets/${id}`, {
+    const response = await fetch(`https://ovolx-api-1.onrender.com/api/baskets/${id}`, {
       method: "PUT",
       headers: {
         "Content-Type": "application/json",
@@ -213,7 +213,7 @@ export const updateBasket = async (id: string, data: Partial<BasketDetail>): Pro
 // Função para excluir uma cesta
 export const deleteBasket = async (id: string): Promise<void> => {
   try {
-    const response = await fetch(`http://localhost:3000/api/baskets/${id}`, {
+    const response = await fetch(`https://ovolx-api-1.onrender.com/api/baskets/${id}`, {
       method: "DELETE",
       headers: {
         Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -232,7 +232,7 @@ export const deleteBasket = async (id: string): Promise<void> => {
 // Função para buscar arquivos de uma cesta
 export const fetchBasketFiles = async (basketId: string): Promise<FileItem[]> => {
   try {
-    const response = await fetch(`http://localhost:3000/api/baskets/${basketId}/files`, {
+    const response = await fetch(`https://ovolx-api-1.onrender.com/api/baskets/${basketId}/files`, {
       headers: {
         Authorization: `Bearer ${localStorage.getItem("token")}`,
       },
@@ -259,7 +259,7 @@ export const uploadFiles = async (basketId: string, files: File[], fileCategory 
     })
     formData.append("file_category", fileCategory)
 
-    const response = await fetch(`http://localhost:3000/api/baskets/${basketId}/files`, {
+    const response = await fetch(`https://ovolx-api-1.onrender.com/api/baskets/${basketId}/files`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -282,7 +282,7 @@ export const uploadFiles = async (basketId: string, files: File[], fileCategory 
 // Função para excluir um arquivo
 export const deleteFile = async (fileId: string): Promise<void> => {
   try {
-    const response = await fetch(`http://localhost:3000/api/files/${fileId}`, {
+    const response = await fetch(`https://ovolx-api-1.onrender.com/api/files/${fileId}`, {
       method: "DELETE",
       headers: {
         Authorization: `Bearer ${localStorage.getItem("token")}`,
@@ -301,7 +301,7 @@ export const deleteFile = async (fileId: string): Promise<void> => {
 // Função para baixar um arquivo
 export const downloadFile = async (fileId: string): Promise<Blob> => {
   try {
-    const response = await fetch(`http://localhost:3000/api/files/${fileId}/download`, {
+    const response = await fetch(`https://ovolx-api-1.onrender.com/api/files/${fileId}/download`, {
       headers: {
         Authorization: `Bearer ${localStorage.getItem("token")}`,
       },

@@ -1129,19 +1129,7 @@ export default function PriceBaskets() {
                     </div>
 
                     <div className="space-y-4">
-                      <div>
-                        <h3 className="text-xs font-semibold uppercase text-gray-500 mb-4">RELATÓRIOS</h3>
-                        <div className="flex gap-2">
-                          <Button
-                            variant="outline"
-                            className="flex-1 h-9 bg-white text-gray-900 border-gray-200 hover:bg-gray-50"
-                            onClick={() => handleViewFile({ name: "MÉDIA DE PREÇOS (MAPA)", size: "", sentDate: "" })}
-                          >
-                            <FileText size={14} className="mr-2" />
-                            MÉDIA DE PREÇOS (MAPA)
-                          </Button>
-                        </div>
-                      </div>
+                     
 
                       <div>
                         <h3 className="text-xs font-semibold uppercase text-gray-500 mb-2 flex items-center gap-2">

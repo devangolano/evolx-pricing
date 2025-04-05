@@ -420,7 +420,7 @@ export function NewBasketFormContent({
       const dataToSend = convertKeysToSnakeCase(basketData)
 
       // Fazer a requisição para criar a cesta
-      const response = await axios.post("http://localhost:3000/api/baskets", dataToSend, {
+      const response = await axios.post("https://ovolx-api-1.onrender.com/api/baskets", dataToSend, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
@@ -438,7 +438,7 @@ export function NewBasketFormContent({
         })
         formData.append("file_category", "purchase")
 
-        await axios.post(`http://localhost:3000/api/baskets/${newBasket.id}/files`, formData, {
+        await axios.post(`https://ovolx-api-1.onrender.com/api/baskets/${newBasket.id}/files`, formData, {
           headers: {
             Authorization: `Bearer ${localStorage.getItem("token")}`,
             "Content-Type": "multipart/form-data",

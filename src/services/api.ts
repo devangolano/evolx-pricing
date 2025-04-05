@@ -1,8 +1,8 @@
 import axios from "axios"
-import { convertSnakeToCamelCase } from "@/utils/api-helpers"
+import { convertKeysToCamelCase } from "@/utils/api-helpers"
 
 // Obter a URL base da API de variáveis de ambiente ou usar um valor padrão
-const API_BASE_URL ="http://localhost:3000/api"
+const API_BASE_URL ="https://ovolx-api-1.onrender.com/api"
 
 // Crie uma instância do axios com configurações base
 const api = axios.create({
@@ -28,7 +28,7 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => {
     if (response.data) {
-      response.data = convertSnakeToCamelCase(response.data)
+      response.data = convertKeysToCamelCase(response.data)
     }
     return response
   },
@@ -47,4 +47,3 @@ export async function checkApiHealth(): Promise<boolean> {
 }
 
 export default api
-

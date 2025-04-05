@@ -32,7 +32,10 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Textarea } from "@/components/ui/textarea"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { notify } from "@/config/toast" 
+import { notify } from "@/config/toast"
+import axios from "axios"
+// Importe o novo componente ExpenseElementSelector
+import { ExpenseElementSelector } from "@/components/expense-element-selector"
 
 // Interface for file items
 interface FileItem {
@@ -41,6 +44,76 @@ interface FileItem {
   sentDate: string
   type?: string
   file?: File
+}
+
+// Interface for basket (em camelCase, como o frontend espera)
+interface Basket {
+  id: string
+  description: string
+  expenseElement: string
+  contractType: string
+  calculationType: string
+  requestDate: string
+  supportStatus: string
+  clientStatus: string
+  possession: string
+  quotationDeadline: string
+  decimals: number
+  correctionTarget: string
+  correctionIndex: string
+  correctionStartDate: string | null
+  correctionEndDate: string | null
+}
+
+// Função para converter snake_case para camelCase
+const snakeToCamel = (str: string) => str.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase())
+
+// Função para converter um objeto de snake_case para camelCase
+const convertKeysToCamelCase = (obj: any): any => {
+  if (Array.isArray(obj)) {
+    return obj.map((item) => convertKeysToCamelCase(item))
+  }
+  if (obj !== null && typeof obj === "object") {
+    return Object.keys(obj).reduce((acc, key) => {
+      const camelKey = snakeToCamel(key)
+      acc[camelKey] = convertKeysToCamelCase(obj[key])
+      return acc
+    }, {} as any)
+  }
+  return obj
+}
+
+// Função para converter camelCase para snake_case
+const camelToSnake = (str: string) => str.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`)
+
+// Função para converter um objeto de camelCase para snake_case
+const convertKeysToSnakeCase = (obj: any): any => {
+  if (Array.isArray(obj)) {
+    return obj.map((item) => convertKeysToSnakeCase(item))
+  }
+  if (obj !== null && typeof obj === "object") {
+    return Object.keys(obj).reduce((acc, key) => {
+      const snakeKey = camelToSnake(key)
+      acc[snakeKey] = convertKeysToSnakeCase(obj[key])
+      return acc
+    }, {} as any)
+  }
+  return obj
+}
+
+// Função para formatar automaticamente a data no padrão DD/MM/AAAA
+const formatDateInput = (value: string): string => {
+  // Remove tudo que não for número
+  const numbers = value.replace(/\D/g, "")
+
+  // Formata de acordo com a quantidade de dígitos
+  if (numbers.length <= 2) {
+    return numbers
+  } else if (numbers.length <= 4) {
+    return `${numbers.slice(0, 2)}/${numbers.slice(2)}`
+  } else {
+    return `${numbers.slice(0, 2)}/${numbers.slice(2, 4)}/${numbers.slice(4, 8)}`
+  }
 }
 
 // Componente de Calendário Simples
@@ -288,9 +361,6 @@ const getFileIcon = (fileType: string | undefined) => {
   }
 }
 
-// Modify the NewBasketForm component to be used directly within the PriceBaskets component
-// Change the export to:
-
 export function NewBasketFormContent({
   onSave,
   onCancel,
@@ -298,37 +368,90 @@ export function NewBasketFormContent({
   onSave: () => void
   onCancel: () => void
 }) {
-  // Keep all the existing state and functions
-  const [description, setDescription] = useState(
-    "CONTRAT.EMPRESA ESP.PARA ELAB.PROJETOS DE COMBATE AO INCENDIO E PÂNICO - ESCOLAS E FESTIVIDADES",
-  )
-  const [expenseElement, setExpenseElement] = useState<string>("MATERIAL DE CONSUMO")
-  const [contractType, setContractType] = useState<string>("LICITAÇÃO")
-  const [calculationType, setCalculationType] = useState<string>("MÉDIA ARITMÉTICA")
-  const [requestDate, setRequestDate] = useState<string>("01/04/2025 00:55")
-  const [supportStatus, setSupportStatus] = useState<string>("CADASTRO")
-  const [clientStatus, setClientStatus] = useState<string>("EM ABERTO")
-  const [possession, setPossession] = useState<string>("CLIENTE")
-  const [quotationDeadline, setQuotationDeadline] = useState<string>("")
-  const [decimals, setDecimals] = useState<number>(3)
-  const [correctionTarget, setCorrectionTarget] = useState<string>("NÃO CORRIGIR")
-  const [correctionIndex, setCorrectionIndex] = useState<string>("Selecionar")
-  const [correctionStartDate, setCorrectionStartDate] = useState<string | null>(null)
-  const [correctionEndDate, setCorrectionEndDate] = useState<string | null>(null)
+  // Estados para os campos do formulário
+  const [description, setDescription] = useState("")
+  const [expenseElement, setExpenseElement] = useState("")
+  const [contractType, setContractType] = useState("")
+  const [calculationType, setCalculationType] = useState("")
+  const [requestDate] = useState(new Date().toLocaleDateString("pt-BR"))
+  const [supportStatus] = useState("CADASTRO")
+  const [clientStatus] = useState("EM ABERTO")
+  const [possession, setPossession] = useState("CLIENTE")
+  const [quotationDeadline, setQuotationDeadline] = useState("")
+  const [decimals, setDecimals] = useState(3)
+  const [correctionTarget, setCorrectionTarget] = useState("")
+  const [correctionIndex, setCorrectionIndex] = useState("")
+  const [correctionStartDate, setCorrectionStartDate] = useState("")
+  const [correctionEndDate, setCorrectionEndDate] = useState("")
 
   // Estados para gerenciar os arquivos
   const [purchaseFiles, setPurchaseFiles] = useState<FileItem[]>([])
   const [isFileUploadOpen, setIsFileUploadOpen] = useState(false)
 
-  // Replace the handleBackToList function with:
+  // Verificar se os campos de correção devem estar desabilitados
+  const isCorrectionDisabled = correctionTarget === ""
+
   const handleBackToList = () => {
     onCancel()
   }
 
-  // Replace the handleSaveBasket function with:
-  const handleSaveBasket = () => {
-    notify.success("Cesta cadastrada com sucesso!")
-    onSave()
+  // Função para salvar a cesta no backend
+  const handleSaveBasket = async () => {
+    try {
+      // Montar os dados da cesta
+      const basketData: Partial<Basket> = {
+        description,
+        expenseElement,
+        contractType,
+        calculationType,
+        requestDate,
+        supportStatus,
+        clientStatus,
+        possession,
+        quotationDeadline,
+        decimals,
+        correctionTarget,
+        correctionIndex,
+        correctionStartDate,
+        correctionEndDate,
+      }
+
+      // Converter os dados para snake_case
+      const dataToSend = convertKeysToSnakeCase(basketData)
+
+      // Fazer a requisição para criar a cesta
+      const response = await axios.post("http://localhost:3000/api/baskets", dataToSend, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      })
+      
+      const newBasket = convertKeysToCamelCase(response.data)
+
+      // Se houver arquivos de compra, fazer o upload
+      if (purchaseFiles.length > 0) {
+        const formData = new FormData()
+        purchaseFiles.forEach((file) => {
+          if (file.file) {
+            formData.append("files", file.file)
+          }
+        })
+        formData.append("file_category", "purchase")
+
+        await axios.post(`http://localhost:3000/api/baskets/${newBasket.id}/files`, formData, {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token")}`,
+            "Content-Type": "multipart/form-data",
+          },
+        })
+      }
+
+      notify.success("Cesta cadastrada com sucesso!")
+      onSave()
+    } catch (error) {
+      console.error("Erro ao cadastrar cesta:", error)
+      notify.error("Erro ao cadastrar cesta")
+    }
   }
 
   // Funções para gerenciar arquivos
@@ -347,16 +470,14 @@ export function NewBasketFormContent({
   }
 
   const handleDownloadFile = (file: FileItem) => {
-    // Simulação de download
+    // Como os arquivos ainda não estão no backend, vamos simular o download
     notify.loading(`Preparando download de ${file.name}...`)
 
-    // Simular um pequeno atraso antes de mostrar o sucesso
     setTimeout(() => {
       notify.success(`Download do arquivo ${file.name} iniciado`)
     }, 1500)
   }
 
-  // Modify the return statement to remove the container and only return the form content:
   return (
     <>
       <div className="bg-gray-50 p-3 border-b border-gray-200 flex justify-between items-center sticky top-0 z-10">
@@ -385,42 +506,19 @@ export function NewBasketFormContent({
         </div>
 
         <div>
-          <h3 className="text-xs font-semibold uppercase text-gray-500 mb-1">OBJETO</h3>
+          <h3 className="text-xs font-semibold uppercase text-gray-500 mb-1">OBJETIVO</h3>
           <Textarea
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             className="min-h-[80px] bg-gray-50 border-gray-200 text-sm"
-            placeholder="Descreva o objeto da cesta"
+            placeholder="Descreva o objetivo da cesta"
           />
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <h3 className="text-xs font-semibold uppercase text-gray-500 mb-1">ELEMENTO DE DESPESA</h3>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="outline"
-                  className="w-full justify-between bg-gray-50 border-gray-200 text-gray-700 h-9 text-sm pl-7 relative"
-                >
-                  <FileText className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
-                  <span className="truncate">{expenseElement}</span>
-                  <ChevronDown size={14} />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => setExpenseElement("MATERIAL DE CONSUMO")}>
-                  MATERIAL DE CONSUMO
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setExpenseElement("MATERIAL DE HIGIENE")}>
-                  MATERIAL DE HIGIENE
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setExpenseElement("MATERIAL DE CONSUMO / MATERIAL DE HIGIENE")}>
-                  MATERIAL DE CONSUMO / MATERIAL DE HIGIENE
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setExpenseElement("OUTROS")}>OUTROS</DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <ExpenseElementSelector value={expenseElement} onChange={setExpenseElement} />
           </div>
 
           <div>
@@ -444,9 +542,7 @@ export function NewBasketFormContent({
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
-        </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <h3 className="text-xs font-semibold uppercase text-gray-500 mb-1">TIPO DE CÁLCULO</h3>
             <DropdownMenu>
@@ -465,9 +561,46 @@ export function NewBasketFormContent({
                   MÉDIA ARITMÉTICA
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setCalculationType("MEDIANA")}>MEDIANA</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setCalculationType("MENOR PREÇO")}>MENOR PREÇO</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setCalculationType("MENOR PREÇO POR ITEM")}>
+                  MENOR PREÇO POR ITEM
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setCalculationType("MENOR PREÇO POR ITEM (APENAS FORNECEDORES)")}>
+                  MENOR PREÇO POR ITEM (APENAS FORNECEDORES)
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setCalculationType("MENOR PREÇO POR LOTE (APENAS FORNECEDORES)")}>
+                  MENOR PREÇO POR LOTE (APENAS FORNECEDORES)
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <h3 className="text-xs font-semibold uppercase text-gray-500 mb-1">DATA DA SOLICITAÇÃO</h3>
+            <div className="relative">
+              <CalendarIcon className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
+              <input
+                type="text"
+                value={requestDate}
+                className="w-full bg-gray-50 border border-gray-200 text-gray-700 h-9 text-sm pl-7 rounded-md cursor-not-allowed opacity-60"
+                placeholder="DD/MM/AAAA"
+                maxLength={10}
+                disabled
+              />
+              <Popover>
+                <PopoverTrigger asChild disabled>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-1 top-1/2 transform -translate-y-1/2 h-7 w-7 cursor-not-allowed opacity-60"
+                    disabled
+                  >
+                    <ChevronDown className="h-4 w-4 text-gray-500" />
+                  </Button>
+                </PopoverTrigger>
+              </Popover>
+            </div>
           </div>
 
           <div>
@@ -510,102 +643,90 @@ export function NewBasketFormContent({
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <h3 className="text-xs font-semibold uppercase text-gray-500 mb-1">DATA DA SOLICITAÇÃO</h3>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  className="w-full justify-between bg-gray-50 border-gray-200 text-gray-700 h-9 text-sm pl-7 relative"
-                >
-                  <CalendarIcon className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
-                  <span className="truncate">{requestDate || "Selecionar data"}</span>
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <SimpleCalendar onSelectDate={(date) => setRequestDate(date)} onClose={() => {}} />
-              </PopoverContent>
-            </Popover>
-          </div>
-
+        <div className="grid grid-cols-1 gap-4">
           <div>
             <h3 className="text-xs font-semibold uppercase text-gray-500 mb-1">PRAZO PARA ENVIO DE COTAÇÕES</h3>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  className="w-full justify-between bg-gray-50 border-gray-200 text-gray-700 h-9 text-sm pl-7 relative"
-                >
-                  <CalendarIcon className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
-                  <span className="truncate">{quotationDeadline || "Selecionar data"}</span>
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <SimpleCalendar onSelectDate={(date) => setQuotationDeadline(date)} onClose={() => {}} />
-              </PopoverContent>
-            </Popover>
+            <div className="relative">
+              <CalendarIcon className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
+              <input
+                type="text"
+                value={quotationDeadline || ""}
+                onChange={(e) => {
+                  const formattedValue = formatDateInput(e.target.value)
+                  setQuotationDeadline(formattedValue)
+                }}
+                className="w-full bg-gray-50 border border-gray-200 text-gray-700 h-9 text-sm pl-7 rounded-md"
+                placeholder="DD/MM/AAAA"
+                maxLength={10}
+              />
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-1 top-1/2 transform -translate-y-1/2 h-7 w-7"
+                  >
+                    <ChevronDown className="h-4 w-4 text-gray-500" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="end">
+                  <SimpleCalendar onSelectDate={(date) => setQuotationDeadline(date)} onClose={() => {}} />
+                </PopoverContent>
+              </Popover>
+            </div>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <h3 className="text-xs font-semibold uppercase text-gray-500 mb-1">SITUAÇÃO SUPORTE</h3>
             <DropdownMenu>
-              <DropdownMenuTrigger asChild>
+              <DropdownMenuTrigger asChild disabled>
                 <Button
                   variant="outline"
-                  className="w-full justify-between bg-gray-50 border-gray-200 text-gray-700 h-9 text-sm pl-7 relative"
+                  className="w-full justify-between bg-gray-50 border-gray-200 text-gray-700 h-9 text-sm pl-7 relative cursor-not-allowed opacity-60"
+                  disabled
                 >
                   <Info className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
-                  <span className="truncate">{supportStatus}</span>
+                  <span className="truncate">CADASTRO</span>
                   <ChevronDown size={14} />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => setSupportStatus("CADASTRO")}>CADASTRO</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setSupportStatus("EM ANDAMENTO")}>EM ANDAMENTO</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setSupportStatus("FINALIZADA")}>FINALIZADA</DropdownMenuItem>
-              </DropdownMenuContent>
             </DropdownMenu>
           </div>
 
           <div>
             <h3 className="text-xs font-semibold uppercase text-gray-500 mb-1">SITUAÇÃO CLIENTE</h3>
             <DropdownMenu>
-              <DropdownMenuTrigger asChild>
+              <DropdownMenuTrigger asChild disabled>
                 <Button
                   variant="outline"
-                  className="w-full justify-between bg-gray-50 border-gray-200 text-gray-700 h-9 text-sm pl-7 relative"
+                  className="w-full justify-between bg-gray-50 border-gray-200 text-gray-700 h-9 text-sm pl-7 relative cursor-not-allowed opacity-60"
+                  disabled
                 >
                   <User className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
-                  <span className="truncate">{clientStatus}</span>
+                  <span className="truncate">EM ABERTO</span>
                   <ChevronDown size={14} />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => setClientStatus("EM ABERTO")}>EM ABERTO</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setClientStatus("EM ANÁLISE")}>EM ANÁLISE</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setClientStatus("PRONTA")}>PRONTA</DropdownMenuItem>
-              </DropdownMenuContent>
             </DropdownMenu>
           </div>
-        </div>
 
-        <div>
-          <h3 className="text-xs font-semibold uppercase text-gray-500 mb-1">POSSE</h3>
-          <div className="flex items-center">
-            <Badge variant="outline" className="mr-2 py-1 px-2 border-gray-200 text-gray-700 text-sm">
-              {possession}
-            </Badge>
-            <Button
-              variant="outline"
-              size="icon"
-              className="h-7 w-7 border-gray-200 text-gray-700 hover:bg-gray-50"
-              onClick={() => setPossession(possession === "CLIENTE" ? "SUPORTE" : "CLIENTE")}
-            >
-              <RefreshCcw size={12} />
-            </Button>
+          <div>
+            <h3 className="text-xs font-semibold uppercase text-gray-500 mb-1">POSSE</h3>
+            <div className="flex items-center">
+              <Badge variant="outline" className="mr-2 py-1 px-2 border-gray-200 text-gray-700 text-sm">
+                {possession}
+              </Badge>
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-7 w-7 border-gray-200 text-gray-700 hover:bg-gray-50"
+                onClick={() => setPossession(possession === "CLIENTE" ? "SUPORTE" : "CLIENTE")}
+              >
+                <RefreshCcw size={12} />
+              </Button>
+            </div>
           </div>
         </div>
 
@@ -626,7 +747,7 @@ export function NewBasketFormContent({
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => setCorrectionTarget("NÃO CORRIGIR")}>NÃO CORRIGIR</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setCorrectionTarget("")}>NÃO CORRIGIR</DropdownMenuItem>
                   <DropdownMenuItem onClick={() => setCorrectionTarget("TODOS OS ITENS")}>
                     TODOS OS ITENS
                   </DropdownMenuItem>
@@ -642,7 +763,8 @@ export function NewBasketFormContent({
                 <DropdownMenuTrigger asChild>
                   <Button
                     variant="outline"
-                    className="w-full justify-between bg-gray-50 border-gray-200 text-gray-700 h-9 text-sm pl-7 relative"
+                    className={`w-full justify-between bg-gray-50 border-gray-200 text-gray-700 h-9 text-sm pl-7 relative ${isCorrectionDisabled ? "opacity-70 cursor-not-allowed" : ""}`}
+                    disabled={isCorrectionDisabled}
                   >
                     <Barcode className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
                     <span className="truncate">{correctionIndex}</span>
@@ -658,37 +780,71 @@ export function NewBasketFormContent({
             </div>
             <div>
               <h4 className="text-xs uppercase text-gray-500 mb-1">DATA INICIAL</h4>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className="w-full justify-between bg-gray-50 border-gray-200 text-gray-700 h-9 text-sm pl-7 relative"
-                  >
-                    <CalendarIcon className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
-                    <span className="truncate">{correctionStartDate || "Selecionar data"}</span>
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <SimpleCalendar onSelectDate={(date) => setCorrectionStartDate(date)} onClose={() => {}} />
-                </PopoverContent>
-              </Popover>
+              <div className="relative">
+                <CalendarIcon className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
+                <input
+                  type="text"
+                  value={correctionStartDate || ""}
+                  onChange={(e) => {
+                    const formattedValue = formatDateInput(e.target.value)
+                    setCorrectionStartDate(formattedValue)
+                  }}
+                  className={`w-full bg-gray-50 border border-gray-200 text-gray-700 h-9 text-sm pl-7 rounded-md ${isCorrectionDisabled ? "opacity-70 cursor-not-allowed" : ""}`}
+                  placeholder="DD/MM/AAAA"
+                  disabled={isCorrectionDisabled}
+                  maxLength={10}
+                />
+                {!isCorrectionDisabled && (
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="absolute right-1 top-1/2 transform -translate-y-1/2 h-7 w-7"
+                      >
+                        <ChevronDown className="h-4 w-4 text-gray-500" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="end">
+                      <SimpleCalendar onSelectDate={(date) => setCorrectionStartDate(date)} onClose={() => {}} />
+                    </PopoverContent>
+                  </Popover>
+                )}
+              </div>
             </div>
             <div>
               <h4 className="text-xs uppercase text-gray-500 mb-1">DATA FINAL</h4>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className="w-full justify-between bg-gray-50 border-gray-200 text-gray-700 h-9 text-sm pl-7 relative"
-                  >
-                    <CalendarIcon className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
-                    <span className="truncate">{correctionEndDate || "Selecionar data"}</span>
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <SimpleCalendar onSelectDate={(date) => setCorrectionEndDate(date)} onClose={() => {}} />
-                </PopoverContent>
-              </Popover>
+              <div className="relative">
+                <CalendarIcon className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
+                <input
+                  type="text"
+                  value={correctionEndDate || ""}
+                  onChange={(e) => {
+                    const formattedValue = formatDateInput(e.target.value)
+                    setCorrectionEndDate(formattedValue)
+                  }}
+                  className={`w-full bg-gray-50 border border-gray-200 text-gray-700 h-9 text-sm pl-7 rounded-md ${isCorrectionDisabled ? "opacity-70 cursor-not-allowed" : ""}`}
+                  placeholder="DD/MM/AAAA"
+                  disabled={isCorrectionDisabled}
+                  maxLength={10}
+                />
+                {!isCorrectionDisabled && (
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="absolute right-1 top-1/2 transform -translate-y-1/2 h-7 w-7"
+                      >
+                        <ChevronDown className="h-4 w-4 text-gray-500" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="end">
+                      <SimpleCalendar onSelectDate={(date) => setCorrectionEndDate(date)} onClose={() => {}} />
+                    </PopoverContent>
+                  </Popover>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -751,7 +907,6 @@ export function NewBasketFormContent({
         </div>
       </div>
 
-      {/* Keep the file upload dialog */}
       <Dialog open={isFileUploadOpen} onOpenChange={setIsFileUploadOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -764,7 +919,6 @@ export function NewBasketFormContent({
   )
 }
 
-// Keep the default export for backward compatibility
 export default function NewBasketForm() {
   const navigate = useNavigate()
 
@@ -786,4 +940,3 @@ export default function NewBasketForm() {
     </div>
   )
 }
-

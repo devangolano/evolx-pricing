@@ -33,7 +33,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Textarea } from "@/components/ui/textarea"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { notify } from "@/config/toast"
-import axios from "axios"
+import api from "@/services/api"
 // Importe o novo componente ExpenseElementSelector
 import { ExpenseElementSelector } from "@/components/expense-element-selector"
 
@@ -416,15 +416,15 @@ export function NewBasketFormContent({
         correctionEndDate,
       }
 
-      // Converter os dados para snake_case
-      const dataToSend = convertKeysToSnakeCase(basketData)
+      // Converter os dados para snake_case e adicionar campos obrigatórios
+      const dataToSend = {
+        ...convertKeysToSnakeCase(basketData),
+        date: new Date().toLocaleString('pt-BR'),
+        status: 'EM ANDAMENTO',
+      }
 
-      // Fazer a requisição para criar a cesta
-      const response = await axios.post("https://ovolx-api-1.onrender.com/api/baskets", dataToSend, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
-        },
-      })
+      // Fazer a requisição para criar a cesta usando a instância do axios configurada
+      const response = await api.post("/api/baskets", dataToSend)
       
       const newBasket = convertKeysToCamelCase(response.data)
 
@@ -438,19 +438,29 @@ export function NewBasketFormContent({
         })
         formData.append("file_category", "purchase")
 
-        await axios.post(`https://ovolx-api-1.onrender.com/api/baskets/${newBasket.id}/files`, formData, {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-            "Content-Type": "multipart/form-data",
-          },
-        })
+        try {
+          await api.post(`/api/baskets/${newBasket.id}/files`, formData, {
+            headers: {
+              "Content-Type": "multipart/form-data",
+            },
+          })
+        } catch (error) {
+          console.error("Erro ao fazer upload dos arquivos:", error)
+          notify.error("Erro ao fazer upload dos arquivos")
+          // Continua mesmo se o upload falhar
+        }
       }
 
       notify.success("Cesta cadastrada com sucesso!")
       onSave()
-    } catch (error) {
+      // Redirecionar para a página de cestas
+      window.location.href = '/cestas-precos'
+    } catch (error: any) {
       console.error("Erro ao cadastrar cesta:", error)
-      notify.error("Erro ao cadastrar cesta")
+      const errorMessage = error.response?.data?.error || 
+                         error.response?.data?.details?.[0] || 
+                         "Erro ao cadastrar cesta"
+      notify.error(errorMessage)
     }
   }
 

@@ -4,18 +4,11 @@ import type React from "react"
 
 import { useState, useEffect } from "react"
 import { User2, Lock, Building2, Loader2 } from "lucide-react"
-import axios from "axios"
 import { useNavigate } from "react-router-dom"
-import { notify } from "../../config/toast"; // Add this import
+import { notify } from "../../config/toast"
+import api from "../../services/api"
 
-const api = axios.create({
-  baseURL: "https://ovolx-api-1.onrender.com",
-  headers: {
-    "Content-Type": "application/json",
-  },
-})
-
-function formatCpfCnpj(value: string) {
+const formatCpfCnpj = (value: string) => {
   value = value.replace(/\D/g, "")
 
   if (value.length > 14) return value.slice(0, 14)
@@ -104,11 +97,15 @@ function App() {
   
     try {
       const cleanDocument = cpf.replace(/\D/g, '');
+      console.log('Enviando login:', { document: cleanDocument, prefecture: institution, hasPassword: !!password });
+      
       const response = await api.post('/auth/login', {
         document: cleanDocument,
         prefecture: institution,
         password,
       });
+
+      console.log('Resposta do login:', response.data);
   
       const { token, user } = response.data;
       
@@ -128,7 +125,12 @@ function App() {
       notify.success("Login realizado com sucesso!");
       navigate('/inicio', { replace: true });
     } catch (err: any) {
-      const errorMessage = err.response?.data?.message || "Erro ao fazer login. Tente novamente.";
+      console.error('Erro no login:', err);
+      if (err.response) {
+        console.error('Status:', err.response.status);
+        console.error('Data:', err.response.data);
+      }
+      const errorMessage = err.response?.data?.error || "Erro ao fazer login. Tente novamente.";
       notify.error(errorMessage);
       setError(errorMessage);
     } finally {
@@ -252,4 +254,3 @@ function App() {
 }
 
 export default App
-

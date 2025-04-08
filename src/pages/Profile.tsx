@@ -1,60 +1,80 @@
-import { RefreshCw, Trash2, Copy, SaveAll, Eye, EyeOff, Lock, User2, Building2 } from 'lucide-react';
+import { Trash2, Copy, SaveAll, Eye, EyeOff, Lock, User2, Building2, RefreshCw } from 'lucide-react';
 import { useState, useRef, useEffect } from "react";
 import { notify } from "../config/toast";
-import axios from "axios";
-
-const api = axios.create({
-  baseURL: "https://ovolx-api-1.onrender.com",
-  headers: {
-    "Content-Type": "application/json",
-  },
-});
+import api from "../services/api";
+import { useNavigate } from "react-router-dom";
 
 export function Profile() {
+  const navigate = useNavigate();
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     name: "",
-    client: "",
     document: "",
+    prefecture: "",
     currentPassword: "",
     newPassword: "",
   });
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isLoading, setIsLoading] = useState(false);
 
+  // Função para obter a URL completa da imagem
+  const getFullImageUrl = (photoPath: string | null) => {
+    if (!photoPath) return null;
+    return `${api.defaults.baseURL}/uploads/${photoPath}`;
+  };
+
   // Carregar dados do usuário ao montar o componente
   useEffect(() => {
     const loadUserData = async () => {
-      const token = localStorage.getItem('token');
-      if (token) {
-        api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-        try {
-          setIsLoading(true);
-          // Ajustado para usar o prefixo /auth nas rotas
-          const response = await api.get('/auth/users/profile');
-          const userData = response.data;
-          
-          setFormData({
-            name: userData.name || "",
-            client: userData.prefecture || "", // corresponde ao campo do backend
-            document: formatCpfCnpj(userData.document || ""),
-            currentPassword: "",
-            newPassword: "",
-          });
-
-          if (userData.photo) {
-            setProfileImage(`${api.defaults.baseURL}/uploads/${userData.photo}`);
-          }
-        } catch (error: any) {
-          notify.error(error.response?.data?.error || "Erro ao carregar dados do perfil");
-        } finally {
-          setIsLoading(false);
+      try {
+        setIsLoading(true);
+        const token = localStorage.getItem('token');
+        
+        if (!token) {
+          console.log('Nenhum token encontrado, redirecionando para login');
+          notify.error('Sessão expirada. Por favor, faça login novamente.');
+          navigate('/auth/entrar');
+          return;
         }
+
+        // Garantir que o token está definido no header
+        api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+        
+        const response = await api.get('/auth/users/profile');
+        
+        const userData = response.data;
+        
+        setFormData({
+          name: userData.name || "",
+          document: userData.document || "",
+          prefecture: userData.prefecture || "",
+          currentPassword: "",
+          newPassword: "",
+        });
+
+        if (userData.photo) {
+          setProfileImage(userData.photo);
+        }
+      } catch (error: any) {
+        console.error('Erro ao carregar dados do usuário:', error);
+        if (error.response) {
+          
+          if (error.response.status === 401 || error.response.status === 404) {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            notify.error('Sessão expirada. Por favor, faça login novamente.');
+            navigate('/auth/entrar');
+            return;
+          }
+        }
+        notify.error('Erro ao carregar dados do usuário');
+      } finally {
+        setIsLoading(false);
       }
     };
 
     loadUserData();
-  }, []);
+  }, [navigate]);
 
   // Função para upload de imagem
   const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -66,22 +86,52 @@ export function Profile() {
     formData.append('photo', file);
 
     try {
-      // Ajustado para usar o prefixo /auth nas rotas
       const response = await api.put('/auth/users/profile', formData, {
-        headers: { 
+        headers: {
           'Content-Type': 'multipart/form-data',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        }
+        },
       });
 
       if (response.data?.photo) {
-        setProfileImage(`${api.defaults.baseURL}/uploads/${response.data.photo}`);
+        setProfileImage(response.data.photo);
         notify.success("Foto atualizada com sucesso!");
       }
-    } catch (error: any) {
-      notify.error(error.response?.data?.error || "Erro ao atualizar foto");
+    } catch (error) {
+      notify.error("Erro ao atualizar foto");
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  // Função para remover a foto
+  const handleRemovePhoto = async () => {
+    if (!profileImage || isLoading) return;
+    
+    setIsLoading(true);
+    try {
+      await api.delete('/auth/users/delete-photo');
+      setProfileImage(null);
+      
+      notify.success("Foto removida com sucesso!");
+    } catch (error) {
+      notify.error("Erro ao remover foto");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Função para copiar URL da imagem
+  const handleCopyImageUrl = async () => {
+    if (!profileImage || isLoading) return;
+    
+    try {
+      const imageUrl = getFullImageUrl(profileImage);
+      if (imageUrl) {
+        await navigator.clipboard.writeText(imageUrl);
+        notify.success("URL da imagem copiada com sucesso!");
+      }
+    } catch (error) {
+      notify.error("Erro ao copiar URL da imagem");
     }
   };
 
@@ -89,18 +139,21 @@ export function Profile() {
   const handleSave = async () => {
     setIsLoading(true);
     try {
-      const updateData: any = {
-        name: formData.name,
-        document: formData.document.replace(/\D/g, ''),
-        prefecture: formData.client, // corresponde ao campo do backend
-      };
+      const formDataToSend = new FormData();
+      formDataToSend.append('name', formData.name);
+      formDataToSend.append('document', formData.document.replace(/\D/g, ''));
+      formDataToSend.append('prefecture', formData.prefecture);
 
-      // Se estiver atualizando a senha
       if (formData.currentPassword && formData.newPassword) {
-        updateData.currentPassword = formData.currentPassword;
-        updateData.newPassword = formData.newPassword;
+        formDataToSend.append('currentPassword', formData.currentPassword);
+        formDataToSend.append('newPassword', formData.newPassword);
       }
 
+      await api.put('/auth/users/profile', formDataToSend, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
 
       notify.success("Perfil atualizado com sucesso!");
       setFormData(prev => ({
@@ -108,8 +161,8 @@ export function Profile() {
         currentPassword: "",
         newPassword: "",
       }));
-    } catch (error: any) {
-      notify.error(error.response?.data?.error || "Falha ao atualizar perfil");
+    } catch (error) {
+      notify.error("Falha ao atualizar perfil");
     } finally {
       setIsLoading(false);
     }
@@ -118,7 +171,7 @@ export function Profile() {
   // Função para formatar CPF/CNPJ
   function formatCpfCnpj(value: string) {
     value = value.replace(/\D/g, "")
-  
+
     if (value.length > 14) return value.slice(0, 14)
     if (value.length > 11) {
       return value
@@ -128,14 +181,14 @@ export function Profile() {
         .replace(/\.(\d{3})(\d)/, ".$1/$2")
         .replace(/(\d{4})(\d)/, "$1-$2")
     }
-  
+
     return value
       .slice(0, 11)
       .replace(/^(\d{3})(\d)/, "$1.$2")
       .replace(/^(\d{3})\.(\d{3})(\d)/, "$1.$2.$3")
       .replace(/(\d{3})(\d)/, "$1-$2")
   }
-  
+
   // Função para lidar com alterações nos inputs
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -167,26 +220,17 @@ export function Profile() {
     }));
   };
 
-  // Função para excluir foto
-  const handleDeletePhoto = async () => {
-    if (!profileImage) return;
-    
-    setIsLoading(true);
-    try {
-      // Ajustado para usar o prefixo /auth nas rotas
-      await api.delete('/auth/user/delete-photo');
-      setProfileImage(null);
-      
-      notify.success("Foto removida com sucesso!");
-    } catch (error: any) {
-      notify.error(error.response?.data?.error || "Erro ao remover foto");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   return (
     <>
+      {isLoading && (
+        <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-50">
+          <div className="bg-white p-4 rounded-lg shadow-lg">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-700 mx-auto mb-2"></div>
+            <p className="text-sm text-gray-600">Carregando...</p>
+          </div>
+        </div>
+      )}
+
       <div className="flex justify-between items-center p-4 shadow-lg bg-white border-b border-[#e0e0e0]">
         <h1 className="text-xl font-medium text-[#302f2f]">Editar perfil</h1>
         <button 
@@ -213,7 +257,11 @@ export function Profile() {
                   disabled={isLoading}
                 />
                 {profileImage ? (
-                  <img src={profileImage || "/placeholder.svg"} alt="Profile" className="w-full h-full object-cover" />
+                  <img 
+                    src={getFullImageUrl(profileImage) || undefined} 
+                    alt="Profile" 
+                    className="w-full h-full object-cover" 
+                  />
                 ) : (
                   <img
                     src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQJ3ztWTGwSgvZJvsA49k950OqfYRhhssQqaw&s"
@@ -239,7 +287,7 @@ export function Profile() {
               </button>
               <button 
                 className={`text-[#646464] hover:text-[#7baa3d] transition-colors ${isLoading || !profileImage ? 'opacity-50 cursor-not-allowed' : ''}`}
-                onClick={handleDeletePhoto}
+                onClick={handleRemovePhoto}
                 disabled={isLoading || !profileImage}
                 title="Excluir foto"
               >
@@ -247,16 +295,7 @@ export function Profile() {
               </button>
               <button 
                 className={`text-[#646464] hover:text-[#7baa3d] transition-colors ${isLoading || !profileImage ? 'opacity-50 cursor-not-allowed' : ''}`}
-                onClick={async () => {
-                  if (profileImage && !isLoading) {
-                    try {
-                      await navigator.clipboard.writeText(profileImage);
-                      notify.success("URL da imagem copiada com sucesso!");
-                    } catch (error) {
-                      notify.error("Erro ao copiar URL da imagem");
-                    }
-                  }
-                }}
+                onClick={handleCopyImageUrl}
                 disabled={isLoading || !profileImage}
                 title="Copiar URL da imagem"
               >
@@ -274,8 +313,9 @@ export function Profile() {
                   type="text"
                   name="name"
                   value={formData.name}
-                  onChange={handleInputChange}
-                  className="w-full rounded px-3 py-2 text-[#2c2c2c] border pl-9"
+                  onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                  className="w-full pl-10 pr-4 py-2 border border-[#e0e0e0] rounded-lg focus:outline-none focus:border-[#7baa3d]"
+                  placeholder="Digite seu nome"
                   disabled={isLoading}
                 />
               </div>
@@ -287,8 +327,8 @@ export function Profile() {
                 <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 text-[#646464] w-4 h-4" />
                 <input
                   type="text"
-                  name="client"
-                  value={formData.client}
+                  name="prefecture"
+                  value={formData.prefecture}
                   onChange={handleInputChange}
                   className="w-full rounded px-3 py-2 text-[#2c2c2c] border pl-9"
                   disabled={isLoading}

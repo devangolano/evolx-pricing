@@ -4,70 +4,47 @@ import { Search, ChevronDown, Menu } from "lucide-react"
 import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import { Sidebar } from "./Sidebar"
-import axios from "axios"
-
-// Configuração da API
-const api = axios.create({
-  baseURL: "https://ovolx-api-1.onrender.com",
-  headers: {
-    "Content-Type": "application/json",
-  },
-})
+import api from "../../services/api"
+import { notify } from "../../config/toast"
 
 export function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [userData, setUserData] = useState<any>(null)
-  const [profileImage, setProfileImage] = useState<string | null>(null)
+  const [userData, setUserData] = useState<any>(() => {
+    const savedUser = localStorage.getItem("user")
+    return savedUser ? JSON.parse(savedUser) : null
+  })
   const [isLoading, setIsLoading] = useState(false)
   const navigate = useNavigate()
 
   // Função para buscar dados do usuário da API
   const fetchUserData = async () => {
     const token = localStorage.getItem("token")
-    if (!token) return
+    if (!token) {
+      navigate('/login')
+      return
+    }
 
-    setIsLoading(true)
-    try {
-      api.defaults.headers.common["Authorization"] = `Bearer ${token}`
-      const response = await api.get("/auth/users/profile")
-      const user = response.data
-
-      // Atualiza o localStorage com os dados mais recentes
-      localStorage.setItem("user", JSON.stringify(user))
-
-      setUserData(user)
-
-      // Define a imagem de perfil se disponível
-      if (user.photo) {
-        setProfileImage(`${api.defaults.baseURL}/uploads/${user.photo}`)
-      } else {
-        setProfileImage(null)
+    if (!userData) {
+      setIsLoading(true)
+      try {
+        const response = await api.get("/auth/users/profile")
+        const user = response.data
+        setUserData(user)
+        localStorage.setItem("user", JSON.stringify(user))
+      } catch (error) {
+        console.error("Erro ao buscar dados do usuário:", error)
+        notify.error("Erro ao carregar dados do usuário")
+        navigate('/login')
+      } finally {
+        setIsLoading(false)
       }
-    } catch (error) {
-      console.error("Erro ao buscar dados do usuário:", error)
-
-      // Tenta usar dados do localStorage como fallback
-      const cachedUser = localStorage.getItem("user")
-      if (cachedUser) {
-        setUserData(JSON.parse(cachedUser))
-      }
-    } finally {
-      setIsLoading(false)
     }
   }
 
-  // Busca dados do usuário ao montar o componente
+  // Busca dados do usuário apenas se não estiverem no estado
   useEffect(() => {
     fetchUserData()
-
-    // Adiciona um listener para atualizar os dados quando o usuário retorna à página
-    window.addEventListener("focus", fetchUserData)
-
-    // Cleanup
-    return () => {
-      window.removeEventListener("focus", fetchUserData)
-    }
   }, [])
 
   // Adiciona um listener para o evento personalizado de atualização de perfil
@@ -92,7 +69,6 @@ export function Navbar() {
     localStorage.clear()
     sessionStorage.clear()
     setUserData(null)
-    setProfileImage(null)
     window.location.href = "/auth/entrar"
   }
 
@@ -123,9 +99,9 @@ export function Navbar() {
 
           <div className="flex items-center gap-2 sm:gap-3">
             <div className="bg-white rounded-full flex items-center justify-center overflow-hidden h-8 w-8 sm:h-10 sm:w-10">
-              {profileImage ? (
+              {userData?.photo ? (
                 <img
-                  src={profileImage || "/placeholder.svg"}
+                  src={`${api.defaults.baseURL}/uploads/${userData.photo}`}
                   alt={userData?.name || "Perfil"}
                   className="h-full w-full object-cover"
                 />
@@ -201,4 +177,3 @@ export function Navbar() {
     </>
   )
 }
-

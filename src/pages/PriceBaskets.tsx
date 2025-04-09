@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, type ChangeEvent } from "react"
-import { useNavigate } from "react-router-dom"
+import { useNavigate, useParams } from "react-router-dom"
 import {
   Filter,
   CalendarIcon,
@@ -47,6 +47,7 @@ type Status = "CADASTRO" | "EM ANDAMENTO" | "PRONTA" | "LIBERADA PARA CESTA" | "
 
 export default function PriceBaskets() {
   const navigate = useNavigate()
+  const { basketId } = useParams() // Pegar o ID da URL
   const [selectedBasket, setSelectedBasket] = useState<BasketDetail | null>(null)
   const [filteredBaskets, setFilteredBaskets] = useState<BasketDetail[]>([])
   const [visibleBaskets, setVisibleBaskets] = useState<BasketDetail[]>([])
@@ -114,15 +115,22 @@ export default function PriceBaskets() {
     setVisibleBaskets(filteredBaskets.slice(0, itemsToShow))
   }, [filteredBaskets, itemsToShow])
 
-  const handleBasketClick = async (basket: BasketDetail) => {
-    navigate(`/basket/${basket.id}`)
-    setSelectedBasket(basket)
-    setIsNewBasketMode(false)
-    setShowDetailsMobile(true)
+  useEffect(() => {
+    if (basketId) {
+      const basket = filteredBaskets.find((basket) => basket.id === basketId)
+      if (basket) {
+        setSelectedBasket(basket)
+        setShowDetailsMobile(true)
+        loadBasketFiles(basket.id) // Carrega os arquivos quando a cesta é selecionada pela URL
+      } else {
+        setSelectedBasket(null)
+      }
+    }
+  }, [basketId, filteredBaskets])
 
+  const loadBasketFiles = async (basketId: string) => {
     try {
-      // Carregar os arquivos da cesta quando ela for selecionada
-      const files = await fetchBasketFiles(basket.id);
+      const files = await fetchBasketFiles(basketId);
       const basketFiles = files.filter((file) => file.fileCategory === "basket" || !file.fileCategory);
       const purchaseFiles = files.filter((file) => file.fileCategory === "purchase");
       setBasketFiles(basketFiles);
@@ -131,6 +139,14 @@ export default function PriceBaskets() {
       console.error("Erro ao carregar arquivos:", error);
       notify.error("Erro ao carregar arquivos");
     }
+  }
+
+  const handleBasketClick = async (basket: BasketDetail) => {
+    navigate(`/cestas-precos/${basket.id}`)
+    setSelectedBasket(basket)
+    setIsNewBasketMode(false)
+    setShowDetailsMobile(true)
+    await loadBasketFiles(basket.id) // Carrega os arquivos quando a cesta é clicada
   }
 
   const handleClearFilters = () => {
@@ -245,7 +261,7 @@ export default function PriceBaskets() {
     }
   }
 
-  const handleRemoveFile = async (fileId: string, isBasketFile: boolean) => {
+  const handleRemoveFile = async (fileId: string) => {
     try {
       setIsLoading(true)
       await deleteFile(fileId)
@@ -442,7 +458,7 @@ export default function PriceBaskets() {
           <div className="p-2 sm:p-3 border-b border-gray-200">
             <Button
               className="w-full bg-[#7baa3d] hover:bg-[#6a9934] text-white h-8 sm:h-9 text-xs sm:text-sm"
-              onClick={() => navigate("/basket/novo")}
+              onClick={() => navigate("/cestas-precos/novo")}
             >
               <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
               NOVA CESTA
@@ -865,7 +881,7 @@ export default function PriceBaskets() {
                                         variant="ghost"
                                         size="icon"
                                         className="h-8 w-8"
-                                        onClick={() => file.id && handleRemoveFile(file.id, true)}
+                                        onClick={() => file.id && handleRemoveFile(file.id)}
                                       >
                                         <Trash2 size={16} className="text-red-600" />
                                       </Button>
@@ -924,7 +940,7 @@ export default function PriceBaskets() {
                                         variant="ghost"
                                         size="icon"
                                         className="h-8 w-8"
-                                        onClick={() => file.id && handleRemoveFile(file.id, false)}
+                                        onClick={() => file.id && handleRemoveFile(file.id)}
                                       >
                                         <Trash2 size={16} className="text-red-600" />
                                       </Button>

@@ -47,6 +47,10 @@ export const router = createBrowserRouter([
         element: <PriceBaskets />,
       },
       {
+        path: '/cestas-precos/:basketId',
+        element: <PriceBaskets />,
+      },
+      {
         path: '/cestas-precos/novo',
         element: <NewBasketForm />, 
       },

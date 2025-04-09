@@ -1,4 +1,4 @@
-import { Clock, LayoutGrid, Heart, MessageSquare, FileText, ClipboardList, Settings, LogOut, X } from "lucide-react"
+import { Clock, LayoutGrid, MessageSquare, FileText, ClipboardList, Settings, LogOut, X } from "lucide-react"
 import { useState, useEffect } from "react"
 import { Link, useLocation } from "react-router-dom"
 import { useNavigate } from "react-router-dom";
@@ -38,10 +38,9 @@ export function Sidebar({ isOpen = true, onClose }: SidebarProps) {
   const menuItems = [
     { icon: Clock, label: "Página Inicial", path: "/inicio" },
     { icon: LayoutGrid, label: "Cestas de Preços", path: "/cestas-precos" },
-    { icon: Heart, label: "Cestas", path: "/cestas" },
+    { icon: ClipboardList, label: "Catálogo de Produtos", path: "/catalogo-produtos" },
     { icon: MessageSquare, label: "Atendimento", path: "/atendimento" },
     { icon: FileText, label: "Catálogo de Preços", path: "/catalogo-precos" },
-    { icon: ClipboardList, label: "Catálogo de Produtos", path: "/catalogo-produtos" },
   ];
 
   const handleLogout = () => {

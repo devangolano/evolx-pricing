@@ -387,6 +387,7 @@ export function NewBasketFormContent({
   // Estados para gerenciar os arquivos
   const [purchaseFiles, setPurchaseFiles] = useState<FileItem[]>([])
   const [isFileUploadOpen, setIsFileUploadOpen] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
 
   // Verificar se os campos de correção devem estar desabilitados
   const isCorrectionDisabled = correctionTarget === ""
@@ -398,6 +399,7 @@ export function NewBasketFormContent({
   // Função para salvar a cesta no backend
   const handleSaveBasket = async () => {
     try {
+      setIsSaving(true)
       // Montar os dados da cesta
       const basketData: Partial<Basket> = {
         description,
@@ -461,6 +463,8 @@ export function NewBasketFormContent({
                          error.response?.data?.details?.[0] || 
                          "Erro ao cadastrar cesta"
       notify.error(errorMessage)
+    } finally {
+      setIsSaving(false)
     }
   }
 
@@ -501,8 +505,15 @@ export function NewBasketFormContent({
           </Button>
           <h2 className="text-lg font-medium text-gray-900">Cadastrar Cesta</h2>
         </div>
-        <Button onClick={handleSaveBasket} className="bg-[#7baa3d] hover:bg-[#6a9934] text-white">
-          Salvar
+        <Button onClick={handleSaveBasket} disabled={isSaving} className="bg-[#7baa3d] hover:bg-[#6a9934] text-white">
+          {isSaving ? (
+            <>
+              <span className="mr-2">Salvando</span>
+              <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-r-transparent" />
+            </>
+          ) : (
+            "Salvar"
+          )}
         </Button>
       </div>
 

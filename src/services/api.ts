@@ -2,7 +2,7 @@ import axios from "axios"
 import { convertKeysToCamelCase } from "@/utils/api-helpers"
 
 // Obter a URL base da API de variáveis de ambiente ou usar um valor padrão
-const API_BASE_URL = "http://localhost:3000"
+const API_BASE_URL = "https://ovolx-api-1.onrender.com"
 
 // Crie uma instância do axios com configurações base
 const api = axios.create({

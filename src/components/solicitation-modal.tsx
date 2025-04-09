@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState } from "react"
+import React, { useState, useEffect } from "react"
 import { ChevronLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
@@ -12,20 +12,42 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { ExpenseElementSelector } from "./expense-element-selector"
+import { type Product, type NewProduct } from "@/services/product-service"
+import { notify } from "@/config/toast"
 
 interface SolicitationModalProps {
   isOpen: boolean
   onClose: () => void
-  onSave: (data: any) => void
+  onSave: (data: NewProduct) => Promise<void>
+  productToEdit?: Product
 }
 
-export function SolicitationModal({ isOpen, onClose, onSave }: SolicitationModalProps) {
-  const [formData, setFormData] = useState({
+export function SolicitationModal({ isOpen, onClose, onSave, productToEdit }: SolicitationModalProps) {
+  const [formData, setFormData] = useState<NewProduct>({
     code: "",
     unit: "",
     description: "",
     expenseElement: "",
   })
+  const [isSaving, setIsSaving] = useState(false)
+
+  useEffect(() => {
+    if (productToEdit) {
+      setFormData({
+        code: productToEdit.code,
+        unit: productToEdit.unit,
+        description: productToEdit.description,
+        expenseElement: productToEdit.expenseElement,
+      })
+    } else {
+      setFormData({
+        code: "",
+        unit: "",
+        description: "",
+        expenseElement: "",
+      })
+    }
+  }, [productToEdit])
 
   const handleCodeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     // Remove qualquer caractere não numérico
@@ -33,9 +55,20 @@ export function SolicitationModal({ isOpen, onClose, onSave }: SolicitationModal
     setFormData((prev) => ({ ...prev, code: onlyNumbers }))
   }
 
-  const handleSave = () => {
-    onSave(formData)
-    setFormData({ code: "", unit: "", description: "", expenseElement: "" })
+  const handleSave = async () => {
+    // Validar campos obrigatórios
+    if (!formData.code || !formData.unit || !formData.description || !formData.expenseElement) {
+      notify.error("Todos os campos são obrigatórios")
+      return
+    }
+
+    try {
+      setIsSaving(true)
+      await onSave(formData)
+      setFormData({ code: "", unit: "", description: "", expenseElement: "" })
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   return (
@@ -44,7 +77,9 @@ export function SolicitationModal({ isOpen, onClose, onSave }: SolicitationModal
         <DialogHeader className="p-4 border-b border-[#2a2a2a]">
           <div className="flex items-center gap-2">
             <ChevronLeft className="h-4 w-4 text-gray-400 cursor-pointer" onClick={onClose} />
-            <DialogTitle className="text-white">Solicitar Cadastro</DialogTitle>
+            <DialogTitle className="text-white">
+              {productToEdit ? "Editar Produto" : "Solicitar Cadastro"}
+            </DialogTitle>
           </div>
         </DialogHeader>
 
@@ -61,6 +96,7 @@ export function SolicitationModal({ isOpen, onClose, onSave }: SolicitationModal
                 onChange={handleCodeChange}
                 className="bg-[#1e1e1e] border-[#2a2a2a] text-white"
                 placeholder="Digite o código do produto"
+                required
               />
             </div>
 
@@ -74,6 +110,7 @@ export function SolicitationModal({ isOpen, onClose, onSave }: SolicitationModal
                 onChange={(e) => setFormData((prev) => ({ ...prev, unit: e.target.value }))}
                 className="bg-[#1e1e1e] border-[#2a2a2a] text-white"
                 placeholder="Digite a unidade do produto"
+                required
               />
             </div>
 
@@ -87,6 +124,7 @@ export function SolicitationModal({ isOpen, onClose, onSave }: SolicitationModal
                 onChange={(e) => setFormData((prev) => ({ ...prev, description: e.target.value }))}
                 className="bg-[#1e1e1e] border-[#2a2a2a] text-white"
                 placeholder="Digite a descrição do produto"
+                required
               />
             </div>
 
@@ -102,24 +140,21 @@ export function SolicitationModal({ isOpen, onClose, onSave }: SolicitationModal
           </div>
         </div>
 
-        {/* Botões fixos */}
-        <div className="border-t border-[#2a2a2a] p-4">
-          <div className="flex justify-end gap-3">
-            <Button
-              variant="outline"
-              onClick={onClose}
-              className="w-32 border-[#2a2a2a] text-gray-400 hover:bg-[#1e1e1e]"
-            >
-              Cancelar
-            </Button>
-            <Button
-              onClick={handleSave}
-              className="w-32 bg-[#7baa3d] hover:bg-[#6a9934]"
-              disabled={!formData.code || !formData.unit || !formData.description}
-            >
-              Salvar
-            </Button>
-          </div>
+        {/* Botões */}
+        <div className="p-4 border-t border-[#2a2a2a] flex justify-end gap-2">
+          <Button variant="outline" onClick={onClose} className="border-[#2a2a2a] text-gray-400 hover:text-white">
+            Cancelar
+          </Button>
+          <Button onClick={handleSave} disabled={isSaving} className="bg-[#7baa3d] hover:bg-[#6a9934]">
+            {isSaving ? (
+              <>
+                <span className="mr-2">Salvando</span>
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-r-transparent" />
+              </>
+            ) : (
+              productToEdit ? "Salvar" : "Cadastrar"
+            )}
+          </Button>
         </div>
       </DialogContent>
     </Dialog>

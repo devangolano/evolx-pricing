@@ -1,31 +1,15 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { ChevronLeft, Filter, Plus, Search } from "lucide-react"
+import { ChevronLeft, Filter, Plus, Search, Pencil, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Input } from "@/components/ui/input"
 import { useNavigate } from "react-router-dom"
 import { SolicitationModal } from "@/components/solicitation-modal"
 import { ExpenseElementSelector } from "@/components/expense-element-selector"
-
-interface Product {
-  id: string
-  code: string
-  quantity?: string
-  description: string
-  reviewed: boolean
-  status?: string
-  unit?: string
-  expenseElement?: string
-}
-
-interface NewProduct {
-  code: string
-  unit: string
-  description: string
-  expenseElement: string
-}
+import { notify } from "@/config/toast"
+import { fetchProducts, createProduct, deleteProduct, updateProduct, type Product, type NewProduct } from "@/services/product-service"
 
 const units = ["UN", "COMPRIMIDO", "PACOTE", "CAIXA"]
 
@@ -37,59 +21,27 @@ export function ProductCatalog() {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [visibleProducts, setVisibleProducts] = useState(15)
   const [isLoading, setIsLoading] = useState(true)
+  const [products, setProducts] = useState<Product[]>([])
+  const [selectedProduct, setSelectedProduct] = useState<Product | undefined>()
 
   useEffect(() => {
-    // Simular carregamento dos produtos
-    setTimeout(() => {
-      setIsLoading(false)
-    }, 1500)
+    loadProducts()
   }, [])
 
-  const filteredUnits = units.filter((unit) => unit.toLowerCase().includes(unitSearch.toLowerCase()))
+  const loadProducts = async () => {
+    try {
+      setIsLoading(true)
+      const data = await fetchProducts()
+      setProducts(data)
+    } catch (error) {
+      notify.error("Erro ao carregar produtos")
+      console.error("Erro ao buscar produtos:", error)
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
-  // Sample data - replace with your actual data
-  const [products, setProducts] = useState<Product[]>([
-    {
-      id: "1",
-      code: "#123456",
-      quantity: "(14)",
-      description: "ABACAVIR SULFATO, DOSAGEM/CONCENTRAÇÃO: 300 MG",
-      reviewed: true,
-      status: "COMPRIMIDO",
-      unit: "COMPRIMIDO",
-      expenseElement: "MEDICAMENTOS",
-    },
-    {
-      id: "2",
-      code: "#234567",
-      quantity: "(4)",
-      description: "ABAFADOR IMPRESSORA, TIPO: GABINETE",
-      reviewed: false,
-      status: "UN",
-      unit: "UN",
-      expenseElement: "MATERIAL DE ESCRITÓRIO",
-    },
-    {
-      id: "3",
-      code: "#939281",
-      quantity: "(14)",
-      description: "ABACAVIR SULFATO, DOSAGEM/CONCENTRAÇÃO: 300 MG",
-      reviewed: true,
-      status: "COMPRIMIDO",
-      unit: "COMPRIMIDO",
-      expenseElement: "MEDICAMENTOS",
-    },
-    {
-      id: "4",
-      code: "#1125720",
-      quantity: "(4)",
-      description: "ABAFADOR IMPRESSORA, TIPO: GABINETE",
-      reviewed: false,
-      status: "UN",
-      unit: "UN",
-      expenseElement: "MATERIAL DE ESCRITÓRIO",
-    },
-  ])
+  const filteredUnits = units.filter((unit) => unit.toLowerCase().includes(unitSearch.toLowerCase()))
 
   const filteredProducts = products.filter((product) => {
     const searchMatch =
@@ -110,27 +62,65 @@ export function ProductCatalog() {
     setSearchTerm("")
   }
 
-  const handleSaveSolicitation = (data: NewProduct) => {
-    const product: Product = {
-      id: Math.random().toString(36).substr(2, 9),
-      code: `#${data.code.padStart(6, "0")}`,
-      description: data.description,
-      reviewed: false,
-      status: data.unit,
-      unit: data.unit,
-      expenseElement: data.expenseElement,
+  const handleSaveSolicitation = async (data: NewProduct): Promise<void> => {
+    try {
+      setIsLoading(true)
+      if (selectedProduct) {
+        const updatedProduct = await updateProduct(selectedProduct.id, data)
+        setProducts(prev => prev.map(p => p.id === selectedProduct.id ? updatedProduct : p))
+        notify.success("Produto atualizado com sucesso!")
+      } else {
+        const newProduct = await createProduct(data)
+        setProducts(prev => [newProduct, ...prev])
+        notify.success("Produto criado com sucesso!")
+      }
+      setIsDialogOpen(false)
+      setSelectedProduct(undefined)
+    } catch (error) {
+      notify.error(selectedProduct ? "Erro ao atualizar produto" : "Erro ao criar produto")
+      console.error("Erro ao salvar produto:", error)
+      throw error // Propaga o erro para o modal mostrar o estado de erro
+    } finally {
+      setIsLoading(false)
     }
-
-    setProducts((prev) => [product, ...prev])
-    setIsDialogOpen(false)
   }
 
   const handleLoadMore = () => {
     setVisibleProducts((prev) => prev + 15)
   }
 
+  const handleDelete = async (productId: string) => {
+    if (window.confirm("Tem certeza que deseja excluir este produto?")) {
+      try {
+        setIsLoading(true)
+        await deleteProduct(productId)
+        setProducts(prev => prev.filter(p => p.id !== productId))
+        notify.success("Produto excluído com sucesso!")
+      } catch (error) {
+        notify.error("Erro ao excluir produto")
+        console.error("Erro ao excluir produto:", error)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+  }
+
+  const handleEdit = (product: Product) => {
+    setSelectedProduct(product)
+    setIsDialogOpen(true)
+  }
+
   return (
     <div className="flex flex-col h-screen">
+      {isLoading && (
+        <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-50">
+          <div className="bg-white p-4 rounded-lg shadow-lg">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-700 mx-auto mb-2"></div>
+            <p className="text-sm text-gray-600">Carregando...</p>
+          </div>
+        </div>
+      )}
+
       {/* Cabeçalho */}
       <div className="bg-white border-b border-gray-200 sticky top-0 z-10">
         <div className="flex items-center justify-between gap-2 px-2 sm:px-6 py-2 sm:py-4">
@@ -197,114 +187,117 @@ export function ProductCatalog() {
               {unitSearch && filteredUnits.length > 0 && (
                 <div className="absolute z-10 mt-1 w-full bg-white rounded-md border shadow-lg">
                   <div className="py-1">
-                    {filteredUnits.map((unit) => {
-                      return (
-                        <button
-                          key={unit}
-                          className="w-full px-4 py-2 text-sm text-left text-gray-700 hover:bg-gray-100 flex items-center gap-2"
-                          onClick={() => {
-                            setUnitSearch(unit)
-                          }}
-                        >
-                          {unit}
-                        </button>
-                      )
-                    })}
+                    {filteredUnits.map((unit) => (
+                      <button
+                        key={unit}
+                        className="block w-full px-4 py-2 text-sm text-left hover:bg-gray-100"
+                        onClick={() => setUnitSearch(unit)}
+                      >
+                        {unit}
+                      </button>
+                    ))}
                   </div>
                 </div>
               )}
             </div>
-
-            <div className="w-full sm:w-[200px]">
-              <ExpenseElementSelector
-                value={selectedExpenseElement}
-                onChange={setSelectedExpenseElement}
-              />
-            </div>
+            <ExpenseElementSelector
+              value={selectedExpenseElement}
+              onChange={setSelectedExpenseElement}
+            />
           </div>
         </div>
       </div>
 
       {/* Lista de Produtos */}
-      <div className="flex-1 overflow-hidden">
-        <ScrollArea className="h-full">
-          <div className="p-2 sm:p-4">
-            {isLoading && (
-              <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-50">
-                <div className="bg-white p-4 rounded-lg shadow-lg">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-700 mx-auto mb-2"></div>
-                  <p className="text-sm text-gray-600">Carregando...</p>
-                </div>
-              </div>
-            )}
-            {filteredProducts.length > 0 ? (
-              <div className="space-y-2">
+      <ScrollArea className="flex-1">
+        <div className="p-2 sm:p-6">
+          {!isLoading && displayedProducts.length > 0 ? (
+            <>
+              <div className="grid gap-4">
                 {displayedProducts.map((product) => (
                   <div
                     key={product.id}
-                    className={`group rounded p-3 shadow-sm transition-all relative ${
-                      product.reviewed
-                        ? "bg-white border-l-4 border-[#7baa3d] hover:shadow-md hover:scale-[1.01]"
-                        : "bg-white opacity-70"
-                    }`}
+                    className="bg-white py-2 px-3 rounded-lg border border-gray-200 hover:border-[#7baa3d] transition-colors"
                   >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          <span className={`text-sm ${!product.reviewed ? "text-gray-400" : "text-[#7baa3d] font-medium"}`}>{product.code}</span>
-                          {product.quantity && <span className="text-xs text-gray-400">{product.quantity}</span>}
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="text-sm font-medium text-gray-500">{product.code}</span>
+                          {product.reviewed && (
+                            <span className="inline-flex items-center rounded-full bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20">
+                              Revisado
+                            </span>
+                          )}
                         </div>
-                        <p className={`text-sm ${product.reviewed ? "text-gray-700" : "text-gray-600"}`}>{product.description}</p>
-                        {product.expenseElement && (
-                          <div className="mt-1">
-                            <span className={`text-xs ${product.reviewed ? "text-[#7baa3d]" : "text-gray-400"}`}>{product.expenseElement}</span>
-                          </div>
-                        )}
+                        <h3 className="text-base font-semibold text-gray-900 mb-1 line-clamp-2">
+                          {product.description}
+                        </h3>
+                        <p className="text-sm text-gray-600">{product.expenseElement}</p>
                       </div>
-                      {product.status && (
-                        <span className="text-xs text-gray-500 uppercase bg-gray-100 px-2 py-0.5 rounded whitespace-nowrap">
-                          {product.status}
-                        </span>
-                      )}
+                      <div className="flex flex-col items-end gap-2">
+                        <span className="text-sm font-medium text-gray-900">{product.unit}</span>
+                        <div className="flex items-center gap-2 mt-2">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 bg-gray-100 text-gray-500 hover:text-gray-900"
+                            onClick={() => handleEdit(product)}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 bg-red-100 text-red-500 hover:text-red-700"
+                            onClick={() => handleDelete(product.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
                     </div>
-                    {!product.reviewed && (
-                      <div className="absolute hidden group-hover:block bg-white text-gray-700 px-2 py-0.5 rounded text-xs -top-2 left-1/2 transform -translate-x-1/2 border border-gray-200 shadow-sm whitespace-nowrap">
-                        Não revisado
-                      </div>
-                    )}
                   </div>
                 ))}
-                {hasMoreProducts && (
-                  <div className="flex justify-center mt-4">
-                    <Button
-                      variant="outline"
-                      onClick={handleLoadMore}
-                      className="text-[#7baa3d] hover:text-[#6a9934] hover:bg-[#1e1e1e] border-[#7baa3d]"
-                    >
-                      Ver mais
-                    </Button>
-                  </div>
-                )}
               </div>
-            ) : (
-              <div className="flex flex-col items-center justify-center py-8 px-4">
-                <p className="text-gray-500 mb-4 text-center">Nenhum item encontrado</p>
+              {hasMoreProducts && (
+                <div className="mt-4 flex justify-center">
+                  <Button variant="outline" onClick={handleLoadMore}>
+                    Carregar mais
+                  </Button>
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-12">
+              <div className="text-center">
+                <p className="text-lg font-medium text-gray-900 mb-4">
+                  {searchTerm ? `Nenhum produto encontrado para "${searchTerm}"` : "Nenhum produto cadastrado"}
+                </p>
                 <Button
-                  className="bg-[#7baa3d] hover:bg-[#6a9934] text-white"
-                  variant="outline"
+                  variant="default"
                   size="sm"
+                  className="bg-[#7baa3d] hover:bg-[#6a9934]"
                   onClick={() => setIsDialogOpen(true)}
                 >
-                  Solicitar cadastro de produto
+                  <Plus className="h-4 w-4 mr-2" />
+                  Cadastrar Novo Produto
                 </Button>
               </div>
-            )}
-          </div>
-        </ScrollArea>
-      </div>
+            </div>
+          )}
+        </div>
+      </ScrollArea>
 
-      {/* Modal de Cadastro */}
-      <SolicitationModal isOpen={isDialogOpen} onClose={() => setIsDialogOpen(false)} onSave={handleSaveSolicitation} />
+      {/* Modal de Nova Solicitação */}
+      <SolicitationModal
+        isOpen={isDialogOpen}
+        onClose={() => {
+          setIsDialogOpen(false)
+          setSelectedProduct(undefined)
+        }}
+        onSave={handleSaveSolicitation}
+        productToEdit={selectedProduct}
+      />
     </div>
   )
 }

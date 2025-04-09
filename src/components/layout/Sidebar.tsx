@@ -108,14 +108,10 @@ export function Sidebar({ isOpen = true, onClose }: SidebarProps) {
       <div className="mt-auto p-4">
         <div className="flex flex-col items-center mb-6">
           <img
-            src="/logo-iturama.png"
+            src="/icon.png"
             alt="Prefeitura Municipal de Iturama"
             className="max-w-[180px]"
           />
-          <div className="text-center text-xs font-semibold text-[#333333]">
-            <div>PREFEITURA MUNICIPAL</div>
-            <div>DE ITURAMA</div>
-          </div>
         </div>
 
         <ul className="space-y-2">
